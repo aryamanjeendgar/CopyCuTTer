@@ -3,7 +3,7 @@ from textual.events import Key
 from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import Container
-from textual.widgets import Footer, Input, Static, Label, Select
+from textual.widgets import Footer, Input, Static, Label, Select, Tabs
 
 
 LINES = """
@@ -14,6 +14,11 @@ It has survived not only five centuries,
 but also the leap into electronic typesetting,
 remaining essentially unchanged.
 """.splitlines()
+
+NAMES = [
+    "Form",
+    "Code-Browser"
+]
 
 
 class TextQuestion(Static):
@@ -45,9 +50,13 @@ class TestApp(App):
     BINDINGS = [
         ('h', 'dump_values', 'Dump Values')
     ]
+    _tab: Tabs
     _textbox: TextQuestion
+
     def compose(self) -> ComposeResult:
         self._textbox = TextQuestion()
+        self._tab = Tabs(NAMES[0], NAMES[1])
+        yield self._tab
         yield self._textbox
 
     def action_dump_values(self) -> None:
@@ -63,6 +72,13 @@ class TestApp(App):
         if event.key == 'return':
             pass
         pass
+
+    def on_tabs_tab_activated(self, event: Tabs.TabActivated) -> None:
+        """Handle TabActivated message sent by Tabs."""
+        if self._tab.active == 'tab-1':
+            self._textbox.visible = True
+        else:
+            self._textbox.visible = False
 
 if __name__ == "__main__":
     app = TestApp()
