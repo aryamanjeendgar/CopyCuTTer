@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 from textual.events import Key
+from textual import events
 from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import Container
+from textual.reactive import var
 from textual.widgets import Footer, Input, Static, Label, Select, Tabs
+from code_browser import CodeBrowserWidget
 
 
 LINES = """
@@ -48,16 +51,43 @@ class TextQuestion(Static):
 
 class TestApp(App):
     BINDINGS = [
-        ('h', 'dump_values', 'Dump Values')
+        ('h', 'dump_values', 'Dump Values'),
+        ("f", "toggle_files", "Toggle Files"),
+        ("q", "quit", "Quit"),
     ]
+
+    DEFAULT_CSS = """
+        #tree-view {
+            display: none;
+            scrollbar-gutter: stable;
+            overflow: auto;
+            width: auto;
+            height: 100%;
+            dock: left;
+        }
+
+        .-show-tree #tree-view {
+            display: block;
+            max-width: 50%;
+        }
+    """
+
+
+    show_tree = var(True)
     _tab: Tabs
     _textbox: TextQuestion
+    _code_browser: CodeBrowserWidget
+
+    def on_mount(self, event: events.Mount) -> None:
+        self.query_one(Tabs).focus()
 
     def compose(self) -> ComposeResult:
         self._textbox = TextQuestion()
         self._tab = Tabs(NAMES[0], NAMES[1])
+        self._code_browser = CodeBrowserWidget()
         yield self._tab
         yield self._textbox
+        yield self._code_browser
 
     def action_dump_values(self) -> None:
         l1 = self._textbox._input_1.value
@@ -65,6 +95,14 @@ class TestApp(App):
         l3 = self._textbox._input_3.value
         with open('test.txt', 'w') as op_file:
             op_file.write("First Name: {}\nLast Name: {}\nSelect Output: {}".format(l1, l2, l3))
+
+    def action_toggle_files(self) -> None:
+        """Called in response to key binding."""
+        self.show_tree = not self.show_tree
+
+    def watch_show_tree(self, show_tree: bool) -> None:
+        """Called when show_tree is modified."""
+        self.set_class(show_tree, "-show-tree")
 
     # Placeholder for writing to output when TAB/s-TAB is detected in the input-stream
     @on(Key)
@@ -77,8 +115,10 @@ class TestApp(App):
         """Handle TabActivated message sent by Tabs."""
         if self._tab.active == 'tab-1':
             self._textbox.visible = True
+            self._code_browser.visible = False
         else:
             self._textbox.visible = False
+            self._code_browser.visible = True
 
 if __name__ == "__main__":
     app = TestApp()
