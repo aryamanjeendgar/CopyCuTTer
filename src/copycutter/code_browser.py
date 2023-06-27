@@ -16,7 +16,7 @@ from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Container, VerticalScroll
 from textual.reactive import var
-from textual.widgets import DirectoryTree, Footer, Header, Static
+from textual.widgets import DirectoryTree, Header, Static
 
 class CodeBrowserWidget(Static):
     """Textual code browser app."""
@@ -31,7 +31,6 @@ class CodeBrowserWidget(Static):
             yield DirectoryTree(path, id="tree-view")
             with VerticalScroll(id="code-view"):
                 yield Static(id="code", expand=True)
-        yield Footer()
 
     def on_mount(self, event: events.Mount) -> None:
         self.query_one(DirectoryTree).focus()

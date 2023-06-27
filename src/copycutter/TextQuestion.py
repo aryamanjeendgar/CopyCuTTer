@@ -5,7 +5,7 @@ from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import Container
 from textual.reactive import var
-from textual.widgets import Footer, Input, Static, Label, Select, Tabs
+from textual.widgets import Footer, Input, Static, Label, Select, TabbedContent, TabPane
 from code_browser import CodeBrowserWidget
 
 
@@ -39,15 +39,12 @@ class TextQuestion(Static):
         self._input_1 = Input(placeholder="First Name")
         self._input_2 = Input(placeholder="Last Name")
         self._input_3 = Select((line, line) for line in LINES)
-        yield Container(
-            self._label_1,
-            self._input_1,
-            self._label_2,
-            self._input_2,
-            self._label_3,
-            self._input_3
-        )
-        yield Footer()
+        yield self._label_1
+        yield self._input_1
+        yield self._label_2
+        yield self._input_2
+        yield self._label_3
+        yield self._input_3
 
 class TestApp(App):
     BINDINGS = [
@@ -74,35 +71,44 @@ class TestApp(App):
 
 
     show_tree = var(True)
-    _tab: Tabs
-    _textbox: TextQuestion
-    _code_browser: CodeBrowserWidget
 
     def on_mount(self, event: events.Mount) -> None:
-        self.query_one(Tabs).focus()
+        self.query_one(TabbedContent).focus()
+
+    # def compose(self) -> ComposeResult:
+    #     with TabbedContent(initial="jessica"):
+    #         with TabPane("Leto", id="leto"):
+    #             yield Markdown("_LETO_")
+    #         with TabPane("Jessica", id="jessica"):
+    #             yield Markdown("*JESSICA*")
+    #         with TabPane("Paul", id="paul"):
+    #             yield Markdown("`PAUL`")
 
     def compose(self) -> ComposeResult:
-        self._textbox = TextQuestion()
-        self._tab = Tabs(NAMES[0], NAMES[1])
-        self._code_browser = CodeBrowserWidget()
-        yield self._tab
-        yield self._textbox
-        yield self._code_browser
+        yield Footer()
+        with TabbedContent():
+            with TabPane("Form", id='form'):
+                yield TextQuestion()
+            with TabPane("Code-Browser", id='code-browser'):
+                yield CodeBrowserWidget()
+        # yield self._tab
 
     def action_dump_values(self) -> None:
-        l1 = self._textbox._input_1.value
-        l2 = self._textbox._input_2.value
-        l3 = self._textbox._input_3.value
+        l1 = self.query_one(TextQuestion)._input_1.value
+        l2 = self.query_one(TextQuestion)._input_2.value
+        l3 = self.query_one(TextQuestion)._input_3.value
         with open('test.txt', 'w') as op_file:
             op_file.write("First Name: {}\nLast Name: {}\nSelect Output: {}".format(l1, l2, l3))
 
     def action_toggle_files(self) -> None:
         """Called in response to key binding."""
-        self.show_tree = not self.show_tree
+        if self.query_one(TabbedContent).active == 'code-browser':
+            self.show_tree = not self.show_tree
 
     def watch_show_tree(self, show_tree: bool) -> None:
         """Called when show_tree is modified."""
-        self.set_class(show_tree, "-show-tree")
+        if self.query_one(TabbedContent).active == 'code-browser':
+            self.set_class(show_tree, "-show-tree")
 
     # Placeholder for writing to output when TAB/s-TAB is detected in the input-stream
     @on(Key)
@@ -111,15 +117,14 @@ class TestApp(App):
             pass
         pass
 
-    def on_tabs_tab_activated(self, event: Tabs.TabActivated) -> None:
-        """Handle TabActivated message sent by Tabs."""
-        if self._tab.active == 'tab-1':
-            self._textbox.visible = True
-            self._code_browser.visible = False
-        else:
-            self._textbox.visible = False
-            self._code_browser.visible = True
+    # def on_tabs_tab_activated(self, event: Tabs.TabActivated) -> None:
+    #     """Handle TabActivated message sent by Tabs."""
+    #     if self._tab.active == 'tab-1':
+    #         self._textbox.visible = True
+    #         self._code_browser.visible = False
+    #     else:
+    #         self._textbox.visible = False
+    #         self._code_browser.visible = True
 
 if __name__ == "__main__":
-    app = TestApp()
-    app.run()
+    TestApp().run()
