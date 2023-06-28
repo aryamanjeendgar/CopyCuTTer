@@ -53,7 +53,17 @@ class TestApp(App):
         ("q", "quit", "Quit"),
     ]
 
-    DEFAULT_CSS = """
+    CSS = """
+        TabbedContent {
+            height: 100%
+    }
+        ContentSwitcher {
+            height: 100%
+    }
+        TabPane {
+            height: 100%
+    }
+
         #tree-view {
             display: none;
             scrollbar-gutter: stable;
@@ -61,12 +71,12 @@ class TestApp(App):
             width: auto;
             height: 100%;
             dock: left;
-        }
+    }
 
         .-show-tree #tree-view {
             display: block;
             max-width: 50%;
-        }
+    }
     """
 
 
@@ -75,23 +85,13 @@ class TestApp(App):
     def on_mount(self, event: events.Mount) -> None:
         self.query_one(TabbedContent).focus()
 
-    # def compose(self) -> ComposeResult:
-    #     with TabbedContent(initial="jessica"):
-    #         with TabPane("Leto", id="leto"):
-    #             yield Markdown("_LETO_")
-    #         with TabPane("Jessica", id="jessica"):
-    #             yield Markdown("*JESSICA*")
-    #         with TabPane("Paul", id="paul"):
-    #             yield Markdown("`PAUL`")
-
     def compose(self) -> ComposeResult:
-        yield Footer()
         with TabbedContent():
             with TabPane("Form", id='form'):
                 yield TextQuestion()
             with TabPane("Code-Browser", id='code-browser'):
                 yield CodeBrowserWidget()
-        # yield self._tab
+        yield Footer()
 
     def action_dump_values(self) -> None:
         l1 = self.query_one(TextQuestion)._input_1.value
@@ -117,14 +117,6 @@ class TestApp(App):
             pass
         pass
 
-    # def on_tabs_tab_activated(self, event: Tabs.TabActivated) -> None:
-    #     """Handle TabActivated message sent by Tabs."""
-    #     if self._tab.active == 'tab-1':
-    #         self._textbox.visible = True
-    #         self._code_browser.visible = False
-    #     else:
-    #         self._textbox.visible = False
-    #         self._code_browser.visible = True
 
 if __name__ == "__main__":
     TestApp().run()

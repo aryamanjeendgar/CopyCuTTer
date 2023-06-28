@@ -16,7 +16,7 @@ from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Container, VerticalScroll
 from textual.reactive import var
-from textual.widgets import DirectoryTree, Header, Static
+from textual.widgets import DirectoryTree, Static
 
 class CodeBrowserWidget(Static):
     """Textual code browser app."""
@@ -26,7 +26,6 @@ class CodeBrowserWidget(Static):
     def compose(self) -> ComposeResult:
         """Compose our UI."""
         path = "./" if len(sys.argv) < 2 else sys.argv[1]
-        yield Header()
         with Container():
             yield DirectoryTree(path, id="tree-view")
             with VerticalScroll(id="code-view"):
