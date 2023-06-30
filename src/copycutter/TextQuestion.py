@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
+from rich.console import RenderableType
 from textual.events import Key
 from textual import events
 from textual import on
 from textual.app import App, ComposeResult
-from textual.containers import Container
 from textual.reactive import var
 from textual.widgets import Footer, Input, Static, Label, Select, TabbedContent, TabPane
 from code_browser import CodeBrowserWidget
@@ -25,26 +25,39 @@ NAMES = [
 
 
 class TextQuestion(Static):
-    _label_1: Label
-    _label_2: Label
-    _label_3: Label
-    _input_1: Input
-    _input_2: Input
-    _input_3: Select
+    _label: Label
+    _input: Input
+
+    def __init__(self, label, placeholder, **kwargs):
+        super().__init__(**kwargs)
+        self._label = Label(label)
+        self._input = Input(placeholder=placeholder)
 
     def compose(self) -> ComposeResult:
-        self._label_1 = Label("This is a fancy description")
-        self._label_2 = Label("This is another fancy description")
-        self._label_3 = Label("A cool selector")
-        self._input_1 = Input(placeholder="First Name")
-        self._input_2 = Input(placeholder="Last Name")
-        self._input_3 = Select((line, line) for line in LINES)
-        yield self._label_1
-        yield self._input_1
-        yield self._label_2
-        yield self._input_2
-        yield self._label_3
-        yield self._input_3
+        yield self._label
+        yield self._input
+
+    @property
+    def value(self) -> tuple[RenderableType, str]:
+        return (self._label.renderable, self._input.value)
+
+class SelectQuestion(Static):
+    _label: Label
+    _input: Select
+
+    def __init__(self, label, lines, **kwargs):
+        super().__init__(**kwargs)
+        self._label = Label(label)
+        self._input = Select((line, line) for line in lines)
+
+    def compose(self) -> ComposeResult:
+        yield self._label
+        yield self._input
+
+    @property
+    def value(self) -> tuple[RenderableType, str | None]:
+        return (self._label.renderable, self._input.value)
+
 
 class TestApp(App):
     BINDINGS = [
@@ -88,17 +101,22 @@ class TestApp(App):
     def compose(self) -> ComposeResult:
         with TabbedContent():
             with TabPane("Form", id='form'):
-                yield TextQuestion()
+                yield TextQuestion("A thing", "First Name")
+                yield TextQuestion("Another thing", "Last Name")
+                yield SelectQuestion("A multi-choice thing", LINES)
+                pass
             with TabPane("Code-Browser", id='code-browser'):
                 yield CodeBrowserWidget()
         yield Footer()
 
     def action_dump_values(self) -> None:
-        l1 = self.query_one(TextQuestion)._input_1.value
-        l2 = self.query_one(TextQuestion)._input_2.value
-        l3 = self.query_one(TextQuestion)._input_3.value
+        textboxes = self.query(TextQuestion)
+        selects = self.query(SelectQuestion)
         with open('test.txt', 'w') as op_file:
-            op_file.write("First Name: {}\nLast Name: {}\nSelect Output: {}".format(l1, l2, l3))
+            for text in textboxes:
+                op_file.write(f"{text.value[0]}:{text.value[1]}\n")
+            for select in selects:
+                op_file.write(f"{select.value[0]}:{select.value[1]}\n")
 
     def action_toggle_files(self) -> None:
         """Called in response to key binding."""

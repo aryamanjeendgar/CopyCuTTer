@@ -44,7 +44,7 @@ class CodeBrowserWidget(Static):
             syntax = Syntax.from_path(
                 str(event.path),
                 line_numbers=True,
-                word_wrap=False,
+                word_wrap=True,
                 indent_guides=True,
                 theme="github-dark",
             )
