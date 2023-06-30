@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 from rich.console import RenderableType
+import json
+from textual.containers import Container, VerticalScroll
 from textual.events import Key
 from textual import events
 from textual import on
@@ -99,12 +101,10 @@ class TestApp(App):
         self.query_one(TabbedContent).focus()
 
     def compose(self) -> ComposeResult:
+        form_widgets = TestApp.parse_cookie_cutter()
         with TabbedContent():
             with TabPane("Form", id='form'):
-                yield TextQuestion("A thing", "First Name")
-                yield TextQuestion("Another thing", "Last Name")
-                yield SelectQuestion("A multi-choice thing", LINES)
-                pass
+                yield VerticalScroll(*form_widgets)
             with TabPane("Code-Browser", id='code-browser'):
                 yield CodeBrowserWidget()
         yield Footer()
@@ -118,6 +118,35 @@ class TestApp(App):
             for select in selects:
                 op_file.write(f"{select.value[0]}:{select.value[1]}\n")
 
+    @staticmethod
+    def read_cookie_cutter() -> list[tuple[str, str]]:
+        """Helper method for reading cookiecutter.json"""
+        fp = open('cookiecutter.json')
+        cookie_handle = json.load(fp)
+        return list(cookie_handle.items())
+
+    @staticmethod
+    def parse_cookie_cutter():
+        """Helper method for parsing read_cookie_cutter"""
+        template = TestApp.read_cookie_cutter()
+        widgets = []
+        for prompt in template:
+            if isinstance(prompt[1], str):
+                widgets.append(TextQuestion(prompt[0], prompt[1]))
+            elif isinstance(prompt[1], list):
+                widgets.append(SelectQuestion(prompt[0], prompt[1]))
+        return widgets
+
+    @staticmethod
+    def read_copier() -> None:
+        """ Placeholder for a helper method for reading copier.yml"""
+        pass
+
+    @staticmethod
+    def parse_copier() -> None:
+        """Placeholder for a helper method for parsing read_copier()"""
+        pass
+
     def action_toggle_files(self) -> None:
         """Called in response to key binding."""
         if self.query_one(TabbedContent).active == 'code-browser':
@@ -128,13 +157,12 @@ class TestApp(App):
         if self.query_one(TabbedContent).active == 'code-browser':
             self.set_class(show_tree, "-show-tree")
 
-    # Placeholder for writing to output when TAB/s-TAB is detected in the input-stream
     @on(Key)
     def tab_shift_tab_pressed(self, event: Key):
+        """Placeholder for writing to output when TAB/s-TAB is detected in the input-stream"""
         if event.key == 'return':
             pass
         pass
-
 
 if __name__ == "__main__":
     TestApp().run()
