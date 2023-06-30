@@ -10,7 +10,7 @@ authors = [
 ]
 description = "A TUI for the `Scientific-Python/cookie` and `Copier` projects"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 classifiers = [
   "Development Status :: 1 - Planning",
   "Intended Audience :: Science/Research",
@@ -31,7 +31,7 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-  "typing_extensions >=3.7; python_version<'3.8'",
+      'textual >= 0.28.0'
 ]
 
 [project.optional-dependencies]
