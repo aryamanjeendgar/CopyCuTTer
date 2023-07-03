@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+from cookiecutter.exceptions import RepositoryNotFound
 from rich.console import RenderableType
-import json
+import os, json
 from textual.containers import VerticalScroll
 from textual.events import Key
 from cookiecutter.main import cookiecutter
@@ -152,13 +153,13 @@ class TestApp(App):
         """Placeholder for a helper method for parsing read_copier()"""
         pass
 
-    def call_cookie_template(self) -> None:#, template_name: str, repo_source: str, repo_owner: str, options) -> bool:
+    def call_cookie_template(self, template="tookie") -> None:#, template_name: str, repo_source: str, repo_owner: str, options) -> bool:
         """Method to call and dump the current inputs to the template"""
         textboxes = self.query(TextQuestion)
         selects = self.query(SelectQuestion)
             ### This won't work since `cookiecutter` wants full-paths ###
         path = "~/.cookiecutters/{template}"
-        path = path.format(template="cookie")
+        path = os.path.expanduser(path.format(template=template))
         context = {}
             ### Does not work ###
         for text in textboxes:
@@ -175,11 +176,16 @@ class TestApp(App):
             else:
                 # .. else use the intended default
                 context[str(select.value[0])] = select._input._options[1][0]
-        #TODO: Get rid of the hard-baked paths
         #TODO: Allow this to generalize to other `cookiecutter` templates other than
         #`cookie` in a more structured manner
-        cookiecutter(template="cookie", no_input=True, output_dir="/Users/aryamanj/Documents/",
-                     extra_context=context)
+        try:
+            cookiecutter(template=path, no_input=True, output_dir=os.path.expanduser('~/'),
+                        extra_context=context)
+        except RepositoryNotFound:
+            #TODO: add arguments to method to allow for owner and repo_name to be passed in
+            cookiecutter(template="gh:<owner>/<repo_name>", no_input=True, output_dir=os.path.expanduser('~/'),
+                                    extra_context=context)
+
 
     def action_toggle_files(self) -> None:
         """Called in response to key binding."""
