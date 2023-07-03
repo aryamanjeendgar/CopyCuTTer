@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 from rich.console import RenderableType
 import json
-from textual.containers import Container, VerticalScroll
+from textual.containers import VerticalScroll
 from textual.events import Key
+from cookiecutter.main import cookiecutter
 from textual import events
 from textual import on
 from textual.app import App, ComposeResult
@@ -63,7 +64,7 @@ class SelectQuestion(Static):
 
 class TestApp(App):
     BINDINGS = [
-        ('h', 'dump_values', 'Dump Values'),
+        ('h', 'dump_values', 'Generate Template'),
         ("f", "toggle_files", "Toggle Files"),
         ("q", "quit", "Quit"),
     ]
@@ -117,6 +118,7 @@ class TestApp(App):
                 op_file.write(f"{text.value[0]}:{text.value[1]}\n")
             for select in selects:
                 op_file.write(f"{select.value[0]}:{select.value[1]}\n")
+        self.call_cookie_template()
 
     @staticmethod
     def read_cookie_cutter() -> list[tuple[str, str]]:
@@ -131,10 +133,13 @@ class TestApp(App):
         template = TestApp.read_cookie_cutter()
         widgets = []
         for prompt in template:
-            if isinstance(prompt[1], str):
-                widgets.append(TextQuestion(prompt[0], prompt[1]))
-            elif isinstance(prompt[1], list):
-                widgets.append(SelectQuestion(prompt[0], prompt[1]))
+            if prompt[0][0] != "_":
+                if isinstance(prompt[1], str):
+                    # prompt[1] is a default value
+                    widgets.append(TextQuestion(prompt[0], prompt[1]))
+                elif isinstance(prompt[1], list):
+                    # prompt[2] is a list of options to choose from
+                    widgets.append(SelectQuestion(prompt[0], prompt[1]))
         return widgets
 
     @staticmethod
@@ -146,6 +151,35 @@ class TestApp(App):
     def parse_copier() -> None:
         """Placeholder for a helper method for parsing read_copier()"""
         pass
+
+    def call_cookie_template(self) -> None:#, template_name: str, repo_source: str, repo_owner: str, options) -> bool:
+        """Method to call and dump the current inputs to the template"""
+        textboxes = self.query(TextQuestion)
+        selects = self.query(SelectQuestion)
+            ### This won't work since `cookiecutter` wants full-paths ###
+        path = "~/.cookiecutters/{template}"
+        path = path.format(template="cookie")
+        context = {}
+            ### Does not work ###
+        for text in textboxes:
+            if text.value[1] != "":
+                # if the user gave some input use that
+                context[str(text.value[0])] = text.value[1]
+            else:
+                # ... else use the default (held in the placeholder)
+                context[str(text.value[0])] = text._input.placeholder
+        for select in selects:
+            if select.value[1] != None:
+                # If the user selected an input, use that
+                context[str(select.value[0])] = select.value[1]
+            else:
+                # .. else use the intended default
+                context[str(select.value[0])] = select._input._options[1][0]
+        #TODO: Get rid of the hard-baked paths
+        #TODO: Allow this to generalize to other `cookiecutter` templates other than
+        #`cookie` in a more structured manner
+        cookiecutter(template="cookie", no_input=True, output_dir="/Users/aryamanj/Documents/",
+                     extra_context=context)
 
     def action_toggle_files(self) -> None:
         """Called in response to key binding."""
