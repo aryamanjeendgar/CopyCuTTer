@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from cookiecutter.exceptions import RepositoryNotFound
+from cookiecutter.exceptions import OutputDirExistsException, RepositoryNotFound
 from rich.console import RenderableType
 import os, json
 from textual.containers import VerticalScroll
@@ -153,15 +153,13 @@ class TestApp(App):
         """Placeholder for a helper method for parsing read_copier()"""
         pass
 
-    def call_cookie_template(self, template="tookie") -> None:#, template_name: str, repo_source: str, repo_owner: str, options) -> bool:
+    def call_cookie_template(self, template="cookie") -> None:#, template_name: str, repo_source: str, repo_owner: str, options) -> bool:
         """Method to call and dump the current inputs to the template"""
         textboxes = self.query(TextQuestion)
         selects = self.query(SelectQuestion)
-            ### This won't work since `cookiecutter` wants full-paths ###
         path = "~/.cookiecutters/{template}"
         path = os.path.expanduser(path.format(template=template))
         context = {}
-            ### Does not work ###
         for text in textboxes:
             if text.value[1] != "":
                 # if the user gave some input use that
@@ -185,6 +183,11 @@ class TestApp(App):
             #TODO: add arguments to method to allow for owner and repo_name to be passed in
             cookiecutter(template="gh:<owner>/<repo_name>", no_input=True, output_dir=os.path.expanduser('~/'),
                                     extra_context=context)
+        except OutputDirExistsException:
+            """Some code for removing existing directory and regenerating the project"""
+            #TODO: Major problem is being able to grab the `TextQuestion` field with
+            # the name of the directory being created, since it hasn't been explicitly
+            # tagged with a DOM selector
 
 
     def action_toggle_files(self) -> None:
