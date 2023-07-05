@@ -153,7 +153,7 @@ class TestApp(App):
         """Placeholder for a helper method for parsing read_copier()"""
         pass
 
-    def call_cookie_template(self, template="cookie") -> None:#, template_name: str, repo_source: str, repo_owner: str, options) -> bool:
+    def call_cookie_template(self, template="cookie", source='gh', owner="scientific-python", repo_name="cookie") -> None:#, template_name: str, repo_source: str, repo_owner: str, options) -> bool:
         """Method to call and dump the current inputs to the template"""
         textboxes = self.query(TextQuestion)
         selects = self.query(SelectQuestion)
@@ -181,7 +181,8 @@ class TestApp(App):
                         extra_context=context)
         except RepositoryNotFound:
             #TODO: add arguments to method to allow for owner and repo_name to be passed in
-            cookiecutter(template="gh:<owner>/<repo_name>", no_input=True, output_dir=os.path.expanduser('~/'),
+            template_repo_source = "{}:{}/{}".format(source, owner, repo_name)
+            cookiecutter(template=template_repo_source, no_input=True, output_dir=os.path.expanduser('~/'),
                                     extra_context=context)
         except OutputDirExistsException:
             """Some code for removing existing directory and regenerating the project"""
