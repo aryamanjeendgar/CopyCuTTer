@@ -122,10 +122,12 @@ class TestApp(App):
         self.call_cookie_template()
 
     @staticmethod
-    def read_cookie_cutter() -> list[tuple[str, str]]:
+    def read_cookie_cutter() -> list[tuple[str, str]] | dict:
         """Helper method for reading cookiecutter.json"""
         fp = open('cookiecutter.json')
         cookie_handle = json.load(fp)
+        if '__prompts__' in cookie_handle.keys():
+            return cookie_handle
         return list(cookie_handle.items())
 
     @staticmethod
@@ -133,14 +135,28 @@ class TestApp(App):
         """Helper method for parsing read_cookie_cutter"""
         template = TestApp.read_cookie_cutter()
         widgets = []
-        for prompt in template:
-            if prompt[0][0] != "_":
-                if isinstance(prompt[1], str):
-                    # prompt[1] is a default value
-                    widgets.append(TextQuestion(prompt[0], prompt[1]))
-                elif isinstance(prompt[1], list):
-                    # prompt[2] is a list of options to choose from
-                    widgets.append(SelectQuestion(prompt[0], prompt[1]))
+        if isinstance(template, dict):
+            """The __prompts__ field is available"""
+            prompts = template['__prompts__']
+            for prompt in prompts.keys():
+                if isinstance(template[prompt], str):
+                    # template[prompt] is a default value
+                        widgets.append(
+                            TextQuestion(prompts[prompt], template[prompt]))
+                elif isinstance(template[prompt], list):
+                    # templatep[prompt] is a list of options to choose from
+                        widgets.append(
+                            SelectQuestion(prompts[prompt], template[prompt]))
+        else:
+            """No __prompts__"""
+            for prompt in template:
+                if prompt[0][0] != "_":
+                    if isinstance(prompt[1], str):
+                        # prompt[1] is a default value
+                        widgets.append(TextQuestion(prompt[0], prompt[1]))
+                    elif isinstance(prompt[1], list):
+                        # prompt[2] is a list of options to choose from
+                        widgets.append(SelectQuestion(prompt[0], prompt[1]))
         return widgets
 
     @staticmethod
