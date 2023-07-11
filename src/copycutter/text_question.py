@@ -32,12 +32,14 @@ class TextQuestion(Static):
     _label: Label
     _input: Input
     _property_val: str
+    _prompt: str
 
-    def __init__(self, label, placeholder, property_val, **kwargs):
+    def __init__(self, placeholder, property_val, prompt, **kwargs):
         super().__init__(**kwargs)
-        self._label = Label(label)
+        self._label = Label(prompt)
         self._input = Input(placeholder=placeholder)
         self._property_val = property_val
+        self._prompt = prompt
 
     def compose(self) -> ComposeResult:
         yield self._label
@@ -47,21 +49,25 @@ class TextQuestion(Static):
     def value(self) -> tuple[RenderableType, str, str]:
         return (self._label.renderable, self._input.value, self._property_val)
 
-    #TODO: method to show value of actual field when hovering
-    # def watch_mouse_over(self, value: bool) -> None:
-    #     self._label.update("Funni")
-    #     return super().watch_mouse_over(value)
+    def watch_mouse_over(self, value: bool) -> None:
+        if value:
+            self._label.update(self._property_val)
+        else:
+            self._label.update(self._prompt)
+        return super().watch_mouse_over(value)
 
 class SelectQuestion(Static):
     _label: Label
     _input: Select
     _property_val: str
+    _prompt: str
 
-    def __init__(self, label, lines, property_val, **kwargs):
+    def __init__(self, lines, property_val, prompt, **kwargs):
         super().__init__(**kwargs)
-        self._label = Label(label)
+        self._label = Label(prompt)
         self._input = Select((line, line) for line in lines)
         self._property_val = property_val
+        self._prompt = prompt
 
     def compose(self) -> ComposeResult:
         yield self._label
@@ -70,6 +76,13 @@ class SelectQuestion(Static):
     @property
     def value(self) -> tuple[RenderableType, str | None, str]:
         return (self._label.renderable, self._input.value, self._property_val)
+
+    def watch_mouse_over(self, value: bool) -> None:
+        if value:
+            self._label.update(self._property_val)
+        else:
+            self._label.update(self._prompt)
+        return super().watch_mouse_over(value)
 
 
 class TestApp(App):
@@ -151,21 +164,21 @@ class TestApp(App):
                 if isinstance(template[prompt], str):
                     # template[prompt] is a default value
                         widgets.append(
-                            TextQuestion(prompts[prompt], template[prompt], prompt))
+                            TextQuestion(template[prompt], prompt, prompts[prompt]))
                 elif isinstance(template[prompt], list):
-                    # templatep[prompt] is a list of options to choose from
+                    # template[prompt] is a list of options to choose from
                         widgets.append(
-                            SelectQuestion(prompts[prompt], template[prompt], prompt))
+                            SelectQuestion(template[prompt], prompt, prompts[prompt]))
         else:
             """No __prompts__"""
             for prompt in template:
                 if prompt[0][0] != "_":
                     if isinstance(prompt[1], str):
                         # prompt[1] is a default value
-                        widgets.append(TextQuestion(prompt[0], prompt[1], prompt[0]))
+                        widgets.append(TextQuestion(prompt[1], prompt[0], prompt[0]))
                     elif isinstance(prompt[1], list):
                         # prompt[2] is a list of options to choose from
-                        widgets.append(SelectQuestion(prompt[0], prompt[1], prompt[0]))
+                        widgets.append(SelectQuestion(prompt[1], prompt[0], prompt[0]))
         return widgets
 
     @staticmethod
