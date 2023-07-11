@@ -31,36 +31,45 @@ NAMES = [
 class TextQuestion(Static):
     _label: Label
     _input: Input
+    _property_val: str
 
-    def __init__(self, label, placeholder, **kwargs):
+    def __init__(self, label, placeholder, property_val, **kwargs):
         super().__init__(**kwargs)
         self._label = Label(label)
         self._input = Input(placeholder=placeholder)
+        self._property_val = property_val
 
     def compose(self) -> ComposeResult:
         yield self._label
         yield self._input
 
     @property
-    def value(self) -> tuple[RenderableType, str]:
-        return (self._label.renderable, self._input.value)
+    def value(self) -> tuple[RenderableType, str, str]:
+        return (self._label.renderable, self._input.value, self._property_val)
+
+    #TODO: method to show value of actual field when hovering
+    # def watch_mouse_over(self, value: bool) -> None:
+    #     self._label.update("Funni")
+    #     return super().watch_mouse_over(value)
 
 class SelectQuestion(Static):
     _label: Label
     _input: Select
+    _property_val: str
 
-    def __init__(self, label, lines, **kwargs):
+    def __init__(self, label, lines, property_val, **kwargs):
         super().__init__(**kwargs)
         self._label = Label(label)
         self._input = Select((line, line) for line in lines)
+        self._property_val = property_val
 
     def compose(self) -> ComposeResult:
         yield self._label
         yield self._input
 
     @property
-    def value(self) -> tuple[RenderableType, str | None]:
-        return (self._label.renderable, self._input.value)
+    def value(self) -> tuple[RenderableType, str | None, str]:
+        return (self._label.renderable, self._input.value, self._property_val)
 
 
 class TestApp(App):
@@ -142,21 +151,21 @@ class TestApp(App):
                 if isinstance(template[prompt], str):
                     # template[prompt] is a default value
                         widgets.append(
-                            TextQuestion(prompts[prompt], template[prompt]))
+                            TextQuestion(prompts[prompt], template[prompt], prompt))
                 elif isinstance(template[prompt], list):
                     # templatep[prompt] is a list of options to choose from
                         widgets.append(
-                            SelectQuestion(prompts[prompt], template[prompt]))
+                            SelectQuestion(prompts[prompt], template[prompt], prompt))
         else:
             """No __prompts__"""
             for prompt in template:
                 if prompt[0][0] != "_":
                     if isinstance(prompt[1], str):
                         # prompt[1] is a default value
-                        widgets.append(TextQuestion(prompt[0], prompt[1]))
+                        widgets.append(TextQuestion(prompt[0], prompt[1], prompt[0]))
                     elif isinstance(prompt[1], list):
                         # prompt[2] is a list of options to choose from
-                        widgets.append(SelectQuestion(prompt[0], prompt[1]))
+                        widgets.append(SelectQuestion(prompt[0], prompt[1], prompt[0]))
         return widgets
 
     @staticmethod
@@ -176,20 +185,22 @@ class TestApp(App):
         path = "~/.cookiecutters/{template}"
         path = os.path.expanduser(path.format(template=template))
         context = {}
+        #TODO: The `context` builder breaks in the case `cookiecutter.json`
+        # has the `__prompts__` field
         for text in textboxes:
             if text.value[1] != "":
                 # if the user gave some input use that
-                context[str(text.value[0])] = text.value[1]
+                context[str(text.value[2])] = text.value[1]
             else:
                 # ... else use the default (held in the placeholder)
-                context[str(text.value[0])] = text._input.placeholder
+                context[str(text.value[2])] = text._input.placeholder
         for select in selects:
             if select.value[1] != None:
                 # If the user selected an input, use that
-                context[str(select.value[0])] = select.value[1]
+                context[str(select.value[2])] = select.value[1]
             else:
                 # .. else use the intended default
-                context[str(select.value[0])] = select._input._options[1][0]
+                context[str(select.value[2])] = select._input._options[1][0]
         #TODO: Allow this to generalize to other `cookiecutter` templates other than
         #`cookie` in a more structured manner
         if not os.path.isdir("./tmp"):
