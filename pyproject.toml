@@ -51,6 +51,9 @@ docs = [
   "furo",
 ]
 
+[project.scripts]
+copycutter = "CopyCuTTer.text_question:__main__"
+
 [project.urls]
 Homepage = "https://github.com/aryamanjeendgar/CopyCuTTer"
 "Bug Tracker" = "https://github.com/aryamanjeendgar/CopyCuTTer/issues"

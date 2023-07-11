@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from cookiecutter.exceptions import OutputDirExistsException, RepositoryNotFound
 from rich.console import RenderableType
-import os, json
+import os, json, subprocess
 from textual.containers import VerticalScroll
 from textual.events import Key
 from cookiecutter.main import cookiecutter
@@ -192,15 +192,21 @@ class TestApp(App):
                 context[str(select.value[0])] = select._input._options[1][0]
         #TODO: Allow this to generalize to other `cookiecutter` templates other than
         #`cookie` in a more structured manner
+        if not os.path.isdir("./tmp"):
+            subprocess.run(["mkdir", "tmp"])
         try:
-            cookiecutter(template=path, no_input=True, output_dir=os.path.expanduser('~/'),
+            cookiecutter(template=path, no_input=True, output_dir=os.path.expanduser('./tmp'),
                         extra_context=context)
         except RepositoryNotFound:
             #TODO: add arguments to method to allow for owner and repo_name to be passed in
             template_repo_source = "{}:{}/{}".format(source, owner, repo_name)
-            cookiecutter(template=template_repo_source, no_input=True, output_dir=os.path.expanduser('~/'),
+            cookiecutter(template=template_repo_source, no_input=True, output_dir=os.path.expanduser('./tmp'),
                                     extra_context=context)
         except OutputDirExistsException:
+            subprocess.run(["rm", "-rf", "tmp"])
+            subprocess.run(["mkdir", "tmp"])
+            cookiecutter(template=path, no_input=True, output_dir=os.path.expanduser('./tmp'),
+                                    extra_context=context)
             """Some code for removing existing directory and regenerating the project"""
             #TODO: Major problem is being able to grab the `TextQuestion` field with
             # the name of the directory being created, since it hasn't been explicitly
