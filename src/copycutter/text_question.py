@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 from cookiecutter.exceptions import OutputDirExistsException, RepositoryNotFound
 from rich.console import RenderableType
-import os, json, subprocess
+import os, json, subprocess, yaml
+from textual.widget import Widget
 from textual.containers import VerticalScroll
 from textual.events import Key
 from cookiecutter.main import cookiecutter
@@ -125,7 +126,7 @@ class TestApp(App):
         self.query_one(TabbedContent).focus()
 
     def compose(self) -> ComposeResult:
-        form_widgets = TestApp.parse_cookie_cutter()
+        form_widgets = TestApp.parse_copier()
         with TabbedContent():
             with TabPane("Form", id='form'):
                 yield VerticalScroll(*form_widgets)
@@ -153,7 +154,7 @@ class TestApp(App):
         return list(cookie_handle.items())
 
     @staticmethod
-    def parse_cookie_cutter():
+    def parse_cookie_cutter() -> list[Widget]:
         """Helper method for parsing read_cookie_cutter"""
         template = TestApp.read_cookie_cutter()
         widgets = []
@@ -182,14 +183,42 @@ class TestApp(App):
         return widgets
 
     @staticmethod
-    def read_copier() -> None:
-        """ Placeholder for a helper method for reading copier.yml"""
-        pass
+    def read_copier() -> list[tuple[str, dict]]:
+        """Helper method for reading in copier.yml"""
+        with open('./copier.yml', 'r') as f:
+            copier_handle = yaml.safe_load(f)
+        return list(copier_handle.items())
 
     @staticmethod
-    def parse_copier() -> None:
-        """Placeholder for a helper method for parsing read_copier()"""
-        pass
+    def parse_copier() -> list[Widget]:
+        """Helper method for parsing read_copier's output"""""
+        template = TestApp.read_copier()
+        widgets = []
+        for prompt in template:
+            if prompt[0][0] != "_":
+                if 'choices' in prompt[1].keys():
+                    # A `SelectQuestion` field
+                    if 'help' in prompt[1].keys():
+                        # if descriptions for fields exist
+                        widgets.append(SelectQuestion(prompt[1]['choices'],
+                                                    prompt[0], prompt[1]['help']))
+                    else:
+                        # ... if they do not
+                        widgets.append(SelectQuestion(prompt[1]['choices'],
+                                                    prompt[0], prompt[0]))
+                else:
+                    # A `TextQuestion` field
+                    if 'help' in prompt[1].keys():
+                        # If descriptions for fields exist
+                        #TODO: Figure out how to deal with
+                        # `placeholder` and `default` fields
+                        widgets.append(TextQuestion("", prompt[0],
+                                                        prompt[1]['help']))
+                    else:
+                        # ... in case they do not
+                        widgets.append(TextQuestion("", prompt[0],
+                                                        prompt[0]))
+        return widgets
 
     def call_cookie_template(self, template="cookie", source='gh', owner="scientific-python", repo_name="cookie") -> None:#, template_name: str, repo_source: str, repo_owner: str, options) -> bool:
         """Method to call and dump the current inputs to the template"""
