@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
+from typing import Optional
 from cookiecutter.exceptions import OutputDirExistsException, RepositoryNotFound
+from copier.errors import UnsafeTemplateError
 from rich.console import RenderableType
-import os, json, subprocess, yaml
+import os, sys, json, subprocess, yaml
 from textual.widget import Widget
 from textual.containers import VerticalScroll
 from textual.events import Key
 from cookiecutter.main import cookiecutter
+from copier import run_copy
 from textual import events
 from textual import on
 from textual.app import App, ComposeResult
@@ -62,21 +65,23 @@ class SelectQuestion(Static):
     _input: Select
     _property_val: str
     _prompt: str
+    _extras: Optional[str]
 
-    def __init__(self, lines, property_val, prompt, **kwargs):
+    def __init__(self, lines, property_val, prompt, _extras, **kwargs):
         super().__init__(**kwargs)
         self._label = Label(prompt)
         self._input = Select((line, line) for line in lines)
         self._property_val = property_val
         self._prompt = prompt
+        self._extras = _extras
 
     def compose(self) -> ComposeResult:
         yield self._label
         yield self._input
 
     @property
-    def value(self) -> tuple[RenderableType, str | None, str]:
-        return (self._label.renderable, self._input.value, self._property_val)
+    def value(self) -> tuple[RenderableType, str | None, str, Optional[str]]:
+        return (self._label.renderable, self._input.value, self._property_val, self._extras)
 
     def watch_mouse_over(self, value: bool) -> None:
         if value:
@@ -126,7 +131,11 @@ class TestApp(App):
         self.query_one(TabbedContent).focus()
 
     def compose(self) -> ComposeResult:
-        form_widgets = TestApp.parse_copier()
+        template_type = "cookie" if len(sys.argv) < 2 else sys.argv[1]
+        if template_type == "copier":
+            form_widgets = TestApp.parse_copier()
+        else:
+            form_widgets = TestApp.parse_cookie_cutter()
         with TabbedContent():
             with TabPane("Form", id='form'):
                 yield VerticalScroll(*form_widgets)
@@ -142,7 +151,8 @@ class TestApp(App):
                 op_file.write(f"{text.value[0]}:{text.value[1]}\n")
             for select in selects:
                 op_file.write(f"{select.value[0]}:{select.value[1]}\n")
-        self.call_cookie_template()
+        # self.call_cookie_template()
+        self.call_copier_template()
 
     @staticmethod
     def read_cookie_cutter() -> list[tuple[str, str]] | dict:
@@ -169,7 +179,7 @@ class TestApp(App):
                 elif isinstance(template[prompt], list):
                     # template[prompt] is a list of options to choose from
                         widgets.append(
-                            SelectQuestion(template[prompt], prompt, prompts[prompt]))
+                            SelectQuestion(template[prompt], prompt, prompts[prompt], None))
         else:
             """No __prompts__"""
             for prompt in template:
@@ -179,7 +189,7 @@ class TestApp(App):
                         widgets.append(TextQuestion(prompt[1], prompt[0], prompt[0]))
                     elif isinstance(prompt[1], list):
                         # prompt[2] is a list of options to choose from
-                        widgets.append(SelectQuestion(prompt[1], prompt[0], prompt[0]))
+                        widgets.append(SelectQuestion(prompt[1], prompt[0], prompt[0], None))
         return widgets
 
     @staticmethod
@@ -198,14 +208,27 @@ class TestApp(App):
             if prompt[0][0] != "_":
                 if 'choices' in prompt[1].keys():
                     # A `SelectQuestion` field
-                    if 'help' in prompt[1].keys():
-                        # if descriptions for fields exist
-                        widgets.append(SelectQuestion(prompt[1]['choices'],
-                                                    prompt[0], prompt[1]['help']))
+                    if isinstance(prompt[1]['choices'], dict):
+                        # The choices in copier can be specified eithe
+                        # via a dictionary....
+                        if 'help' in prompt[1].keys():
+                            # if descriptions for fields exist
+                            widgets.append(SelectQuestion(prompt[1]['choices'].keys(),
+                                                          prompt[0], prompt[1]['help'], prompt[1]['choices']))
+                        else:
+                            # ... if they do not
+                            widgets.append(SelectQuestion(prompt[1]['choices'].keys(),
+                                                          prompt[0], prompt[0], prompt[1]['choices']))
                     else:
-                        # ... if they do not
-                        widgets.append(SelectQuestion(prompt[1]['choices'],
-                                                    prompt[0], prompt[0]))
+                        # .... Or as a list
+                        if 'help' in prompt[1]:
+                            # if descriptions for fields exist
+                            widgets.append(SelectQuestion(prompt[1]['choices'],
+                                                          prompt[0], prompt[1]['help'], None))
+                        else:
+                            # ... if they do not
+                            widgets.append(SelectQuestion(prompt[1]['choices'],
+                                                          prompt[0], prompt[0], None))
                 else:
                     # A `TextQuestion` field
                     if 'help' in prompt[1].keys():
@@ -220,7 +243,7 @@ class TestApp(App):
                                                         prompt[0]))
         return widgets
 
-    def call_cookie_template(self, template="cookie", source='gh', owner="scientific-python", repo_name="cookie") -> None:#, template_name: str, repo_source: str, repo_owner: str, options) -> bool:
+    def call_cookie_template(self, template="cookie", source='gh', owner="scientific-python", repo_name="cookie") -> None:
         """Method to call and dump the current inputs to the template"""
         textboxes = self.query(TextQuestion)
         selects = self.query(SelectQuestion)
@@ -265,6 +288,44 @@ class TestApp(App):
             # the name of the directory being created, since it hasn't been explicitly
             # tagged with a DOM selector
 
+    def call_copier_template(self, source="gh", owner="scientific-python", repo_name="cookie") -> None:
+        textboxes = self.query(TextQuestion)
+        selects = self.query(SelectQuestion)
+        context = {}
+        for text in textboxes:
+            if text.value[1] != "":
+                # if the user gave some input use that
+                context[str(text.value[2])] = text.value[1]
+            else:
+                # in copier's case, there is no necessitating supplying
+                # the `default` field for a template, so we cannot proceed
+                # here and just have to show an appropriate error message
+                # to the user
+                return
+                pass
+                # context[str(text.value[2])] = text._input.placeholder
+        for select in selects:
+            if select.value[1] != None:
+                # If the user selected an input, use that
+                if select.value[3] is None:
+                    # This particular `SelectQuestion` question had it's
+                    # `choices` field provided as a list
+                    context[str(select.value[2])] = select.value[1]
+                else:
+                    # This particular `SelectQuestion` question had it's
+                    # `choices` field provided as a dict
+                    context[str(select.value[2])] = select.value[3][select.value[1]]
+            else:
+                # .. else use the first option as the intended default
+                context[str(select.value[2])] = select._input._options[1][0]
+        if not os.path.isdir("./tmp"):
+            subprocess.run(["mkdir", "tmp"])
+        try:
+            run_copy(src_path="{}:{}/{}".format(source, owner, repo_name), dst_path='./tmp', data=context)
+        except UnsafeTemplateError:
+            # with open('test.txt', 'w') as op_file:
+            #     op_file.write(json.dumps(context))
+            run_copy(src_path="{}:{}/{}".format(source, owner, repo_name), dst_path='./tmp', data=context, unsafe=True)
 
     def action_toggle_files(self) -> None:
         """Called in response to key binding."""

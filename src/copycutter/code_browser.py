@@ -25,7 +25,7 @@ class CodeBrowserWidget(Static):
 
     def compose(self) -> ComposeResult:
         """Compose our UI."""
-        path = "./" if len(sys.argv) < 2 else sys.argv[1]
+        path = "./" #if len(sys.argv) < 2 else sys.argv[1]
         with Container():
             yield DirectoryTree(path, id="tree-view")
             with VerticalScroll(id="code-view"):
