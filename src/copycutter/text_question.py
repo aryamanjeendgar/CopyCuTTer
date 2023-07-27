@@ -146,13 +146,13 @@ class TestApp(App):
     def action_dump_values(self) -> None:
         textboxes = self.query(TextQuestion)
         selects = self.query(SelectQuestion)
-        with open('test.txt', 'w') as op_file:
-            for text in textboxes:
-                op_file.write(f"{text.value[0]}:{text.value[1]}\n")
-            for select in selects:
-                op_file.write(f"{select.value[0]}:{select.value[1]}\n")
-        # self.call_cookie_template()
-        self.call_copier_template()
+        # with open('test.txt', 'w') as op_file:
+        #     for text in textboxes:
+        #         op_file.write(f"{text.value[0]}:{text.value[1]}\n")
+        #     for select in selects:
+        #         op_file.write(f"{select.value[0]}:{select.value[1]}\n")
+        self.call_cookie_template()
+        # self.call_copier_template()
 
     @staticmethod
     def read_cookie_cutter() -> list[tuple[str, str]] | dict:
@@ -183,8 +183,9 @@ class TestApp(App):
                         # information provided via a dictionary
                         tmp = prompts[prompt].copy()
                         del tmp['__prompt__']
+                        inv_map = {v: k for k, v in tmp.items()}
                         widgets.append(
-                            SelectQuestion(list(tmp.values()), prompt, prompts[prompt]['__prompt__'], list(tmp.keys()))
+                            SelectQuestion(list(tmp.values()), prompt, prompts[prompt]['__prompt__'], inv_map)
                         )
                     else:
                         widgets.append(
@@ -269,14 +270,25 @@ class TestApp(App):
                 # ... else use the default (held in the placeholder)
                 context[str(text.value[2])] = text._input.placeholder
         for select in selects:
-            if select.value[1] != None:
+            if select.value[1] is not None:
                 # If the user selected an input, use that
-                context[str(select.value[2])] = select.value[1]
+                if select.value[-1] is not None:
+                    # in case this is a select field which is represented as a dict
+                    context[str(select.value[2])] = select.value[-1][select.value[1]]
+                else:
+                    context[str(select.value[2])] = select.value[1]
             else:
                 # .. else use the intended default
-                context[str(select.value[2])] = select._input._options[1][0]
+                if select.value[-1] is not None:
+                    # Again, while choosing defaults checks if the select-field is represented
+                    # as a `dict`
+                    context[str(select.value[2])] = select.value[-1][select._input._options[1][0]]
+                else:
+                    context[str(select.value[2])] = select._input._options[1][0]
         #TODO: Allow this to generalize to other `cookiecutter` templates other than
         #`cookie` in a more structured manner
+        # with open('test.txt', 'w') as op_file:
+        #     op_file.write(json.dumps(context))
         if not os.path.isdir("./tmp"):
             subprocess.run(["mkdir", "tmp"])
         try:
