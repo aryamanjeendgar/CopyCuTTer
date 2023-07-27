@@ -178,6 +178,15 @@ class TestApp(App):
                             TextQuestion(template[prompt], prompt, prompts[prompt]))
                 elif isinstance(template[prompt], list):
                     # template[prompt] is a list of options to choose from
+                    if isinstance(prompts[prompt], dict):
+                        # In this case, we have a 'list' type choice, which has some additional
+                        # information provided via a dictionary
+                        tmp = prompts[prompt].copy()
+                        del tmp['__prompt__']
+                        widgets.append(
+                            SelectQuestion(list(tmp.values()), prompt, prompts[prompt]['__prompt__'], list(tmp.keys()))
+                        )
+                    else:
                         widgets.append(
                             SelectQuestion(template[prompt], prompt, prompts[prompt], None))
         else:
@@ -301,8 +310,8 @@ class TestApp(App):
                 # the `default` field for a template, so we cannot proceed
                 # here and just have to show an appropriate error message
                 # to the user
+                #TODO: Make this an error prompt
                 return
-                pass
                 # context[str(text.value[2])] = text._input.placeholder
         for select in selects:
             if select.value[1] != None:
@@ -318,14 +327,16 @@ class TestApp(App):
             else:
                 # .. else use the first option as the intended default
                 context[str(select.value[2])] = select._input._options[1][0]
-        if not os.path.isdir("./tmp"):
-            subprocess.run(["mkdir", "tmp"])
-        try:
-            run_copy(src_path="{}:{}/{}".format(source, owner, repo_name), dst_path='./tmp', data=context)
-        except UnsafeTemplateError:
-            # with open('test.txt', 'w') as op_file:
-            #     op_file.write(json.dumps(context))
-            run_copy(src_path="{}:{}/{}".format(source, owner, repo_name), dst_path='./tmp', data=context, unsafe=True)
+        # if not os.path.isdir("./tmp"):
+        #     subprocess.run(["mkdir", "tmp"])
+        with open('test.txt', 'w') as op_file:
+            op_file.write(json.dumps(context))
+        # try:
+        #     run_copy(src_path="{}:{}/{}".format(source, owner, repo_name), dst_path='./tmp', data=context)
+        # except UnsafeTemplateError:
+        #     # with open('test.txt', 'w') as op_file:
+        #     #     op_file.write(json.dumps(context))
+        #     run_copy(src_path="{}:{}/{}".format(source, owner, repo_name), dst_path='./tmp', data=context, unsafe=True)
 
     def action_toggle_files(self) -> None:
         """Called in response to key binding."""
