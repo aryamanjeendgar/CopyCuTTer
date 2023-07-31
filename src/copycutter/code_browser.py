@@ -1,22 +1,20 @@
-#!/usr/bin/env python3
 """
 Code browser example.
 
 Run with:
 
-    python code_browser.py PATH
+    python -m copycutter.code_browser PATH
 """
-
-import sys
+from __future__ import annotations
 
 from rich.syntax import Syntax
 from rich.traceback import Traceback
-
 from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Container, VerticalScroll
 from textual.reactive import var
 from textual.widgets import DirectoryTree, Static
+
 
 class CodeBrowserWidget(Static):
     """Textual code browser app."""
@@ -25,7 +23,7 @@ class CodeBrowserWidget(Static):
 
     def compose(self) -> ComposeResult:
         """Compose our UI."""
-        path = "./" #if len(sys.argv) < 2 else sys.argv[1]
+        path = "./"  # if len(sys.argv) < 2 else sys.argv[1]
         with Container():
             yield DirectoryTree(path, id="tree-view")
             with VerticalScroll(id="code-view"):
@@ -62,6 +60,8 @@ The problem was essentially to see how to split the contents
 of the initial `code_browser` would be split across the actual `App`
 and the `Static` widget
 """
+
+
 class TestApp(App):
     BINDINGS = [
         ("f", "toggle_files", "Toggle Files"),
@@ -96,6 +96,7 @@ class TestApp(App):
     def action_toggle_files(self) -> None:
         """Called in response to key binding."""
         self.show_tree = not self.show_tree
+
 
 if __name__ == "__main__":
     TestApp().run()

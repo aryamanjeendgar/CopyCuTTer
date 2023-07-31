@@ -31,7 +31,7 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-      'textual >= 0.28.0'
+  'textual >= 0.28.0'
 ]
 
 [project.optional-dependencies]
@@ -52,7 +52,7 @@ docs = [
 ]
 
 [project.scripts]
-copycutter = "CopyCuTTer.text_question:__main__"
+copycutter = "copycutter.text_question:__main__"
 
 [project.urls]
 Homepage = "https://github.com/aryamanjeendgar/CopyCuTTer"

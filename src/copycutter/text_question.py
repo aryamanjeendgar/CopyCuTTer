@@ -1,21 +1,23 @@
-#!/usr/bin/env python3
-from typing import Optional
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+
+import yaml
 from cookiecutter.exceptions import OutputDirExistsException, RepositoryNotFound
-from copier.errors import UnsafeTemplateError
+from cookiecutter.main import cookiecutter
 from rich.console import RenderableType
-import os, sys, json, subprocess, yaml
-from textual.widget import Widget
+from textual import events, on
+from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
 from textual.events import Key
-from cookiecutter.main import cookiecutter
-from copier import run_copy
-from textual import events
-from textual import on
-from textual.app import App, ComposeResult
 from textual.reactive import var
-from textual.widgets import Footer, Input, Static, Label, Select, TabbedContent, TabPane
-from code_browser import CodeBrowserWidget
+from textual.widget import Widget
+from textual.widgets import Footer, Input, Label, Select, Static, TabbedContent, TabPane
 
+from .code_browser import CodeBrowserWidget
 
 LINES = """
 Lorem Ipsum is simply dummy text of the printing and typesetting industry.
@@ -26,10 +28,7 @@ but also the leap into electronic typesetting,
 remaining essentially unchanged.
 """.splitlines()
 
-NAMES = [
-    "Form",
-    "Code-Browser"
-]
+NAMES = ["Form", "Code-Browser"]
 
 
 class TextQuestion(Static):
@@ -60,12 +59,13 @@ class TextQuestion(Static):
             self._label.update(self._prompt)
         return super().watch_mouse_over(value)
 
+
 class SelectQuestion(Static):
     _label: Label
     _input: Select
     _property_val: str
     _prompt: str
-    _extras: Optional[str]
+    _extras: str | None
 
     def __init__(self, lines, property_val, prompt, _extras, **kwargs):
         super().__init__(**kwargs)
@@ -80,8 +80,13 @@ class SelectQuestion(Static):
         yield self._input
 
     @property
-    def value(self) -> tuple[RenderableType, str | None, str, Optional[str]]:
-        return (self._label.renderable, self._input.value, self._property_val, self._extras)
+    def value(self) -> tuple[RenderableType, str | None, str, str | None]:
+        return (
+            self._label.renderable,
+            self._input.value,
+            self._property_val,
+            self._extras,
+        )
 
     def watch_mouse_over(self, value: bool) -> None:
         if value:
@@ -93,7 +98,7 @@ class SelectQuestion(Static):
 
 class TestApp(App):
     BINDINGS = [
-        ('h', 'dump_values', 'Generate Template'),
+        ("h", "dump_values", "Generate Template"),
         ("f", "toggle_files", "Toggle Files"),
         ("q", "quit", "Quit"),
     ]
@@ -124,7 +129,6 @@ class TestApp(App):
     }
     """
 
-
     show_tree = var(True)
 
     def on_mount(self, event: events.Mount) -> None:
@@ -137,9 +141,9 @@ class TestApp(App):
         else:
             form_widgets = TestApp.parse_cookie_cutter()
         with TabbedContent():
-            with TabPane("Form", id='form'):
+            with TabPane("Form", id="form"):
                 yield VerticalScroll(*form_widgets)
-            with TabPane("Code-Browser", id='code-browser'):
+            with TabPane("Code-Browser", id="code-browser"):
                 yield CodeBrowserWidget()
         yield Footer()
 
@@ -157,9 +161,9 @@ class TestApp(App):
     @staticmethod
     def read_cookie_cutter() -> list[tuple[str, str]] | dict:
         """Helper method for reading cookiecutter.json"""
-        fp = open('cookiecutter.json')
+        fp = open("cookiecutter.json")
         cookie_handle = json.load(fp)
-        if '__prompts__' in cookie_handle.keys():
+        if "__prompts__" in cookie_handle:
             return cookie_handle
         return list(cookie_handle.items())
 
@@ -170,26 +174,35 @@ class TestApp(App):
         widgets = []
         if isinstance(template, dict):
             """The __prompts__ field is available"""
-            prompts = template['__prompts__']
-            for prompt in prompts.keys():
+            prompts = template["__prompts__"]
+            for prompt in prompts:
                 if isinstance(template[prompt], str):
                     # template[prompt] is a default value
-                        widgets.append(
-                            TextQuestion(template[prompt], prompt, prompts[prompt]))
+                    widgets.append(
+                        TextQuestion(template[prompt], prompt, prompts[prompt])
+                    )
                 elif isinstance(template[prompt], list):
                     # template[prompt] is a list of options to choose from
                     if isinstance(prompts[prompt], dict):
                         # In this case, we have a 'list' type choice, which has some additional
                         # information provided via a dictionary
                         tmp = prompts[prompt].copy()
-                        del tmp['__prompt__']
+                        del tmp["__prompt__"]
                         inv_map = {v: k for k, v in tmp.items()}
                         widgets.append(
-                            SelectQuestion(list(tmp.values()), prompt, prompts[prompt]['__prompt__'], inv_map)
+                            SelectQuestion(
+                                list(tmp.values()),
+                                prompt,
+                                prompts[prompt]["__prompt__"],
+                                inv_map,
+                            )
                         )
                     else:
                         widgets.append(
-                            SelectQuestion(template[prompt], prompt, prompts[prompt], None))
+                            SelectQuestion(
+                                template[prompt], prompt, prompts[prompt], None
+                            )
+                        )
         else:
             """No __prompts__"""
             for prompt in template:
@@ -199,68 +212,95 @@ class TestApp(App):
                         widgets.append(TextQuestion(prompt[1], prompt[0], prompt[0]))
                     elif isinstance(prompt[1], list):
                         # prompt[2] is a list of options to choose from
-                        widgets.append(SelectQuestion(prompt[1], prompt[0], prompt[0], None))
+                        widgets.append(
+                            SelectQuestion(prompt[1], prompt[0], prompt[0], None)
+                        )
         return widgets
 
     @staticmethod
     def read_copier() -> list[tuple[str, dict]]:
         """Helper method for reading in copier.yml"""
-        with open('./copier.yml', 'r') as f:
+        with open("./copier.yml") as f:
             copier_handle = yaml.safe_load(f)
         return list(copier_handle.items())
 
     @staticmethod
     def parse_copier() -> list[Widget]:
-        """Helper method for parsing read_copier's output"""""
+        """Helper method for parsing read_copier's output""" ""
         template = TestApp.read_copier()
         widgets = []
         for prompt in template:
             if prompt[0][0] != "_":
-                if 'choices' in prompt[1].keys():
+                if "choices" in prompt[1]:
                     # A `SelectQuestion` field
-                    if isinstance(prompt[1]['choices'], dict):
+                    if isinstance(prompt[1]["choices"], dict):
                         # The choices in copier can be specified eithe
                         # via a dictionary....
-                        if 'help' in prompt[1].keys():
+                        if "help" in prompt[1]:
                             # if descriptions for fields exist
-                            widgets.append(SelectQuestion(prompt[1]['choices'].keys(),
-                                                          prompt[0], prompt[1]['help'], prompt[1]['choices']))
+                            widgets.append(
+                                SelectQuestion(
+                                    prompt[1]["choices"].keys(),
+                                    prompt[0],
+                                    prompt[1]["help"],
+                                    prompt[1]["choices"],
+                                )
+                            )
                         else:
                             # ... if they do not
-                            widgets.append(SelectQuestion(prompt[1]['choices'].keys(),
-                                                          prompt[0], prompt[0], prompt[1]['choices']))
+                            widgets.append(
+                                SelectQuestion(
+                                    prompt[1]["choices"].keys(),
+                                    prompt[0],
+                                    prompt[0],
+                                    prompt[1]["choices"],
+                                )
+                            )
                     else:
                         # .... Or as a list
-                        if 'help' in prompt[1]:
+                        if "help" in prompt[1]:
                             # if descriptions for fields exist
-                            widgets.append(SelectQuestion(prompt[1]['choices'],
-                                                          prompt[0], prompt[1]['help'], None))
+                            widgets.append(
+                                SelectQuestion(
+                                    prompt[1]["choices"],
+                                    prompt[0],
+                                    prompt[1]["help"],
+                                    None,
+                                )
+                            )
                         else:
                             # ... if they do not
-                            widgets.append(SelectQuestion(prompt[1]['choices'],
-                                                          prompt[0], prompt[0], None))
+                            widgets.append(
+                                SelectQuestion(
+                                    prompt[1]["choices"], prompt[0], prompt[0], None
+                                )
+                            )
                 else:
                     # A `TextQuestion` field
-                    if 'help' in prompt[1].keys():
+                    if "help" in prompt[1]:
                         # If descriptions for fields exist
-                        #TODO: Figure out how to deal with
+                        # TODO: Figure out how to deal with
                         # `placeholder` and `default` fields
-                        widgets.append(TextQuestion("", prompt[0],
-                                                        prompt[1]['help']))
+                        widgets.append(TextQuestion("", prompt[0], prompt[1]["help"]))
                     else:
                         # ... in case they do not
-                        widgets.append(TextQuestion("", prompt[0],
-                                                        prompt[0]))
+                        widgets.append(TextQuestion("", prompt[0], prompt[0]))
         return widgets
 
-    def call_cookie_template(self, template="cookie", source='gh', owner="scientific-python", repo_name="cookie") -> None:
+    def call_cookie_template(
+        self,
+        template="cookie",
+        source="gh",
+        owner="scientific-python",
+        repo_name="cookie",
+    ) -> None:
         """Method to call and dump the current inputs to the template"""
         textboxes = self.query(TextQuestion)
         selects = self.query(SelectQuestion)
         path = "~/.cookiecutters/{template}"
         path = os.path.expanduser(path.format(template=template))
         context = {}
-        #TODO: The `context` builder breaks in the case `cookiecutter.json`
+        # TODO: The `context` builder breaks in the case `cookiecutter.json`
         # has the `__prompts__` field
         for text in textboxes:
             if text.value[1] != "":
@@ -282,34 +322,50 @@ class TestApp(App):
                 if select.value[-1] is not None:
                     # Again, while choosing defaults checks if the select-field is represented
                     # as a `dict`
-                    context[str(select.value[2])] = select.value[-1][select._input._options[1][0]]
+                    context[str(select.value[2])] = select.value[-1][
+                        select._input._options[1][0]
+                    ]
                 else:
                     context[str(select.value[2])] = select._input._options[1][0]
-        #TODO: Allow this to generalize to other `cookiecutter` templates other than
-        #`cookie` in a more structured manner
+        # TODO: Allow this to generalize to other `cookiecutter` templates other than
+        # `cookie` in a more structured manner
         # with open('test.txt', 'w') as op_file:
         #     op_file.write(json.dumps(context))
         if not os.path.isdir("./tmp"):
             subprocess.run(["mkdir", "tmp"])
         try:
-            cookiecutter(template=path, no_input=True, output_dir=os.path.expanduser('./tmp'),
-                        extra_context=context)
+            cookiecutter(
+                template=path,
+                no_input=True,
+                output_dir=os.path.expanduser("./tmp"),
+                extra_context=context,
+            )
         except RepositoryNotFound:
-            #TODO: add arguments to method to allow for owner and repo_name to be passed in
-            template_repo_source = "{}:{}/{}".format(source, owner, repo_name)
-            cookiecutter(template=template_repo_source, no_input=True, output_dir=os.path.expanduser('./tmp'),
-                                    extra_context=context)
+            # TODO: add arguments to method to allow for owner and repo_name to be passed in
+            template_repo_source = f"{source}:{owner}/{repo_name}"
+            cookiecutter(
+                template=template_repo_source,
+                no_input=True,
+                output_dir=os.path.expanduser("./tmp"),
+                extra_context=context,
+            )
         except OutputDirExistsException:
             subprocess.run(["rm", "-rf", "tmp"])
             subprocess.run(["mkdir", "tmp"])
-            cookiecutter(template=path, no_input=True, output_dir=os.path.expanduser('./tmp'),
-                                    extra_context=context)
+            cookiecutter(
+                template=path,
+                no_input=True,
+                output_dir=os.path.expanduser("./tmp"),
+                extra_context=context,
+            )
             """Some code for removing existing directory and regenerating the project"""
-            #TODO: Major problem is being able to grab the `TextQuestion` field with
+            # TODO: Major problem is being able to grab the `TextQuestion` field with
             # the name of the directory being created, since it hasn't been explicitly
             # tagged with a DOM selector
 
-    def call_copier_template(self, source="gh", owner="scientific-python", repo_name="cookie") -> None:
+    def call_copier_template(
+        self, source="gh", owner="scientific-python", repo_name="cookie"
+    ) -> None:
         textboxes = self.query(TextQuestion)
         selects = self.query(SelectQuestion)
         context = {}
@@ -322,11 +378,11 @@ class TestApp(App):
                 # the `default` field for a template, so we cannot proceed
                 # here and just have to show an appropriate error message
                 # to the user
-                #TODO: Make this an error prompt
+                # TODO: Make this an error prompt
                 return
                 # context[str(text.value[2])] = text._input.placeholder
         for select in selects:
-            if select.value[1] != None:
+            if select.value[1] is not None:
                 # If the user selected an input, use that
                 if select.value[3] is None:
                     # This particular `SelectQuestion` question had it's
@@ -341,7 +397,7 @@ class TestApp(App):
                 context[str(select.value[2])] = select._input._options[1][0]
         # if not os.path.isdir("./tmp"):
         #     subprocess.run(["mkdir", "tmp"])
-        with open('test.txt', 'w') as op_file:
+        with open("test.txt", "w") as op_file:
             op_file.write(json.dumps(context))
         # try:
         #     run_copy(src_path="{}:{}/{}".format(source, owner, repo_name), dst_path='./tmp', data=context)
@@ -352,20 +408,21 @@ class TestApp(App):
 
     def action_toggle_files(self) -> None:
         """Called in response to key binding."""
-        if self.query_one(TabbedContent).active == 'code-browser':
+        if self.query_one(TabbedContent).active == "code-browser":
             self.show_tree = not self.show_tree
 
     def watch_show_tree(self, show_tree: bool) -> None:
         """Called when show_tree is modified."""
-        if self.query_one(TabbedContent).active == 'code-browser':
+        if self.query_one(TabbedContent).active == "code-browser":
             self.set_class(show_tree, "-show-tree")
 
     @on(Key)
     def tab_shift_tab_pressed(self, event: Key):
         """Placeholder for writing to output when TAB/s-TAB is detected in the input-stream"""
-        if event.key == 'return':
+        if event.key == "return":
             pass
         pass
+
 
 if __name__ == "__main__":
     TestApp().run()
