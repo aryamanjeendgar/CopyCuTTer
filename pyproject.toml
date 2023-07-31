@@ -58,7 +58,7 @@ docs = [
 ]
 
 [project.scripts]
-copycutter = "copycutter.text_question:__main__"
+copycutter = "copycutter.text_question:main"
 
 [project.urls]
 Homepage = "https://github.com/aryamanjeendgar/CopyCuTTer"

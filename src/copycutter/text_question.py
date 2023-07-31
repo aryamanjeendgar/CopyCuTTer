@@ -4,6 +4,9 @@ import json
 import os
 import subprocess
 import sys
+import enum
+from pathlib import Path
+import argparse
 
 import yaml
 from cookiecutter.exceptions import OutputDirExistsException, RepositoryNotFound
@@ -18,6 +21,11 @@ from textual.widget import Widget
 from textual.widgets import Footer, Input, Label, Select, Static, TabbedContent, TabPane
 
 from .code_browser import CodeBrowserWidget
+
+
+class Backend(enum.Enum):
+    cookie = enum.auto()
+    copier = enum.auto()
 
 LINES = """
 Lorem Ipsum is simply dummy text of the printing and typesetting industry.
@@ -97,6 +105,7 @@ class SelectQuestion(Static):
 
 
 class TestApp(App):
+
     BINDINGS = [
         ("h", "dump_values", "Generate Template"),
         ("f", "toggle_files", "Toggle Files"),
@@ -131,15 +140,20 @@ class TestApp(App):
 
     show_tree = var(True)
 
+    def __init__(self, backend: Backend, template: Path, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self._backend = backend
+        self._template = template
+
     def on_mount(self, event: events.Mount) -> None:
         self.query_one(TabbedContent).focus()
 
     def compose(self) -> ComposeResult:
-        template_type = "cookie" if len(sys.argv) < 2 else sys.argv[1]
-        if template_type == "copier":
-            form_widgets = TestApp.parse_copier()
+        if self._backend == Backend.copier:
+            form_widgets = self.parse_copier()
         else:
-            form_widgets = TestApp.parse_cookie_cutter()
+            form_widgets = self.parse_cookie_cutter()
         with TabbedContent():
             with TabPane("Form", id="form"):
                 yield VerticalScroll(*form_widgets)
@@ -158,19 +172,17 @@ class TestApp(App):
         self.call_cookie_template()
         # self.call_copier_template()
 
-    @staticmethod
-    def read_cookie_cutter() -> list[tuple[str, str]] | dict:
+    def read_cookie_cutter(self) -> list[tuple[str, str]] | dict:
         """Helper method for reading cookiecutter.json"""
-        fp = open("cookiecutter.json")
+        fp = open(self._template / "cookiecutter.json")
         cookie_handle = json.load(fp)
         if "__prompts__" in cookie_handle:
             return cookie_handle
         return list(cookie_handle.items())
 
-    @staticmethod
-    def parse_cookie_cutter() -> list[Widget]:
+    def parse_cookie_cutter(self) -> list[Widget]:
         """Helper method for parsing read_cookie_cutter"""
-        template = TestApp.read_cookie_cutter()
+        template = self.read_cookie_cutter()
         widgets = []
         if isinstance(template, dict):
             """The __prompts__ field is available"""
@@ -217,17 +229,15 @@ class TestApp(App):
                         )
         return widgets
 
-    @staticmethod
-    def read_copier() -> list[tuple[str, dict]]:
+    def read_copier(self) -> list[tuple[str, dict]]:
         """Helper method for reading in copier.yml"""
-        with open("./copier.yml") as f:
+        with open(self._template / "copier.yml") as f:
             copier_handle = yaml.safe_load(f)
         return list(copier_handle.items())
 
-    @staticmethod
-    def parse_copier() -> list[Widget]:
+    def parse_copier(self) -> list[Widget]:
         """Helper method for parsing read_copier's output""" ""
-        template = TestApp.read_copier()
+        template = self.read_copier()
         widgets = []
         for prompt in template:
             if prompt[0][0] != "_":
@@ -424,5 +434,13 @@ class TestApp(App):
         pass
 
 
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--backend", type=lambda x: getattr(Backend, x), help="Pick a backend", choices=list(Backend))
+    parser.add_argument("template", type=Path, help="Path to template directory")
+    args = parser.parse_args()
+    TestApp(args.backend, args.template).run()
+
+
 if __name__ == "__main__":
-    TestApp().run()
+    main()
