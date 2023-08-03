@@ -7,10 +7,11 @@ import json
 import os
 import subprocess
 from pathlib import Path
+from copier.errors import UnsafeTemplateError
 
 import requests
 import yaml
-from cookiecutter.exceptions import OutputDirExistsException, RepositoryNotFound
+from cookiecutter.exceptions import OutputDirExistsException
 from cookiecutter.main import cookiecutter
 from rich.console import RenderableType
 from textual import events, on
@@ -20,6 +21,7 @@ from textual.events import Key
 from textual.reactive import var
 from textual.widget import Widget
 from textual.widgets import Footer, Input, Label, Select, Static, TabbedContent, TabPane
+from copier.main import run_copy
 
 from .code_browser import CodeBrowserWidget
 
@@ -159,13 +161,6 @@ class TestApp(App):
         yield Footer()
 
     def action_dump_values(self) -> None:
-        textboxes = self.query(TextQuestion)
-        selects = self.query(SelectQuestion)
-        # with open('test.txt', 'w') as op_file:
-        #     for text in textboxes:
-        #         op_file.write(f"{text.value[0]}:{text.value[1]}\n")
-        #     for select in selects:
-        #         op_file.write(f"{select.value[0]}:{select.value[1]}\n")
         if self._backend == Backend.copier:
             self.call_copier_template()
         else:
@@ -313,18 +308,10 @@ class TestApp(App):
                         widgets.append(TextQuestion("", prompt[0], prompt[0]))
         return widgets
 
-    def call_cookie_template(
-        self,
-        template="cookie",
-        source="gh",
-        owner="scientific-python",
-        repo_name="cookie",
-    ) -> None:
+    def call_cookie_template(self) -> None:
         """Method to call and dump the current inputs to the template"""
         textboxes = self.query(TextQuestion)
         selects = self.query(SelectQuestion)
-        path = "~/.cookiecutters/{template}"
-        path = os.path.expanduser(path.format(template=template))
         context = {}
         # TODO: The `context` builder breaks in the case `cookiecutter.json`
         # has the `__prompts__` field
@@ -355,22 +342,11 @@ class TestApp(App):
                     context[str(select.value[2])] = select._input._options[1][0]
         # TODO: Allow this to generalize to other `cookiecutter` templates other than
         # `cookie` in a more structured manner
-        # with open('test.txt', 'w') as op_file:
-        #     op_file.write(json.dumps(context))
         if not os.path.isdir("./tmp"):
             subprocess.run(["mkdir", "tmp"])
         try:
             cookiecutter(
-                template=path,
-                no_input=True,
-                output_dir=os.path.expanduser("./tmp"),
-                extra_context=context,
-            )
-        except RepositoryNotFound:
-            # TODO: add arguments to method to allow for owner and repo_name to be passed in
-            template_repo_source = f"{source}:{owner}/{repo_name}"
-            cookiecutter(
-                template=template_repo_source,
+                template=str(self._template),
                 no_input=True,
                 output_dir=os.path.expanduser("./tmp"),
                 extra_context=context,
@@ -379,19 +355,16 @@ class TestApp(App):
             subprocess.run(["rm", "-rf", "tmp"])
             subprocess.run(["mkdir", "tmp"])
             cookiecutter(
-                template=path,
+                template=str(self._template),
                 no_input=True,
                 output_dir=os.path.expanduser("./tmp"),
                 extra_context=context,
             )
-            """Some code for removing existing directory and regenerating the project"""
-            # TODO: Major problem is being able to grab the `TextQuestion` field with
-            # the name of the directory being created, since it hasn't been explicitly
-            # tagged with a DOM selector
+            """Some code for removing existing directory and regenerating the project
+            That code should go into the handler for the button/binding that is pressed
+            for commiting changes"""
 
-    def call_copier_template(
-        self, source="gh", owner="scientific-python", repo_name="cookie"
-    ) -> None:
+    def call_copier_template(self) -> None:
         textboxes = self.query(TextQuestion)
         selects = self.query(SelectQuestion)
         context = {}
@@ -421,16 +394,14 @@ class TestApp(App):
             else:
                 # .. else use the first option as the intended default
                 context[str(select.value[2])] = select._input._options[1][0]
-        # if not os.path.isdir("./tmp"):
-        #     subprocess.run(["mkdir", "tmp"])
-        with open("test.txt", "w") as op_file:
-            op_file.write(json.dumps(context))
-        # try:
-        #     run_copy(src_path="{}:{}/{}".format(source, owner, repo_name), dst_path='./tmp', data=context)
-        # except UnsafeTemplateError:
-        #     # with open('test.txt', 'w') as op_file:
-        #     #     op_file.write(json.dumps(context))
-        #     run_copy(src_path="{}:{}/{}".format(source, owner, repo_name), dst_path='./tmp', data=context, unsafe=True)
+        if not os.path.isdir("./tmp"):
+            subprocess.run(["mkdir", "tmp"])
+        # with open("test.txt", "w") as op_file:
+        #     op_file.write(json.dumps(context))
+        try:
+            run_copy(src_path=str(self._template), dst_path='./tmp', data=context)
+        except UnsafeTemplateError:
+            run_copy(src_path=str(self._template), dst_path='./tmp', data=context, unsafe=True)
 
     def grab_github(self, repo_owner: str, repo_name: str) -> str:
         if self._backend == Backend.copier:
