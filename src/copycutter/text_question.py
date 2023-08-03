@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import argparse
+import base64
+import enum
 import json
 import os
 import subprocess
-import sys
-import enum
 from pathlib import Path
-import argparse
 
+import requests
 import yaml
 from cookiecutter.exceptions import OutputDirExistsException, RepositoryNotFound
 from cookiecutter.main import cookiecutter
@@ -26,15 +27,6 @@ from .code_browser import CodeBrowserWidget
 class Backend(enum.Enum):
     cookie = enum.auto()
     copier = enum.auto()
-
-LINES = """
-Lorem Ipsum is simply dummy text of the printing and typesetting industry.
-Lorem Ipsum has been the industry's standard dummy text ever since the 1500s,
-when an unknown printer took a galley of type and scrambled it to make a type specimen book.
-It has survived not only five centuries,
-but also the leap into electronic typesetting,
-remaining essentially unchanged.
-""".splitlines()
 
 NAMES = ["Form", "Code-Browser"]
 
@@ -145,6 +137,11 @@ class TestApp(App):
 
         self._backend = backend
         self._template = template
+        #HACK, structure this out better
+        path_string = str(template)
+        if "gh" in path_string:
+            self._repo_owner = path_string[3: path_string.index('/')]
+            self._repo_name = path_string[path_string.index('/') + 1: ]
 
     def on_mount(self, event: events.Mount) -> None:
         self.query_one(TabbedContent).focus()
@@ -169,20 +166,31 @@ class TestApp(App):
         #         op_file.write(f"{text.value[0]}:{text.value[1]}\n")
         #     for select in selects:
         #         op_file.write(f"{select.value[0]}:{select.value[1]}\n")
-        self.call_cookie_template()
-        # self.call_copier_template()
+        if self._backend == Backend.copier:
+            self.call_copier_template()
+        else:
+            self.call_cookie_template()
 
-    def read_cookie_cutter(self) -> list[tuple[str, str]] | dict:
+    def read_cookie_cutter(self, repo_owner: str | None, repo_name: str | None) -> list[tuple[str, str]] | dict:
         """Helper method for reading cookiecutter.json"""
-        fp = open(self._template / "cookiecutter.json")
-        cookie_handle = json.load(fp)
+        cookie_handle = None
+        if Path.exists(self._template):
+            fp = open(self._template / "cookiecutter.json")
+            cookie_handle = json.load(fp)
+        else:
+            if repo_owner is not None and repo_name is not None:
+                f = self.grab_github(repo_owner, repo_name)
+                cookie_handle = json.loads(f)
         if "__prompts__" in cookie_handle:
             return cookie_handle
         return list(cookie_handle.items())
 
     def parse_cookie_cutter(self) -> list[Widget]:
         """Helper method for parsing read_cookie_cutter"""
-        template = self.read_cookie_cutter()
+        if hasattr(self, '_repo_owner'):
+            template = self.read_cookie_cutter(self._repo_owner, self._repo_name)
+        else:
+            template = self.read_cookie_cutter(None, None)
         widgets = []
         if isinstance(template, dict):
             """The __prompts__ field is available"""
@@ -229,15 +237,23 @@ class TestApp(App):
                         )
         return widgets
 
-    def read_copier(self) -> list[tuple[str, dict]]:
+    def read_copier(self, repo_owner: str | None, repo_name: str | None) -> list[tuple[str, dict]]:
         """Helper method for reading in copier.yml"""
-        with open(self._template / "copier.yml") as f:
-            copier_handle = yaml.safe_load(f)
+        copier_handle = None
+        if Path.exists(self._template):
+            f = open(self._template / "copier.yml")
+        else:
+            if repo_owner is not None and repo_name is not None:
+                f = self.grab_github(repo_owner, repo_name)
+        copier_handle = yaml.safe_load(f)
         return list(copier_handle.items())
 
     def parse_copier(self) -> list[Widget]:
         """Helper method for parsing read_copier's output""" ""
-        template = self.read_copier()
+        if hasattr(self, '_repo_owner'):
+            template = self.read_copier(self._repo_owner, self._repo_name)
+        else:
+            template = self.read_copier(None, None)
         widgets = []
         for prompt in template:
             if prompt[0][0] != "_":
@@ -416,6 +432,21 @@ class TestApp(App):
         #     #     op_file.write(json.dumps(context))
         #     run_copy(src_path="{}:{}/{}".format(source, owner, repo_name), dst_path='./tmp', data=context, unsafe=True)
 
+    def grab_github(self, repo_owner: str, repo_name: str) -> str:
+        if self._backend == Backend.copier:
+            url = 'https://api.github.com/repos/{}/{}/contents/copier.yml'.format(repo_owner, repo_name)
+        else:
+            url = 'https://api.github.com/repos/{}/{}/contents/cookiecutter.json'.format(repo_owner, repo_name)
+        response = requests.get(url)
+        # Check if the request was successful (status code 200)
+        if response.status_code == 200:
+            # Attempt to decode the response content as JSON
+            file_info = response.json()
+            file_content = base64.b64decode(file_info['content']).decode('utf-8')
+        else:
+            print("Error:", response.status_code)
+        return file_content
+
     def action_toggle_files(self) -> None:
         """Called in response to key binding."""
         if self.query_one(TabbedContent).active == "code-browser":
@@ -436,7 +467,7 @@ class TestApp(App):
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--backend", type=lambda x: getattr(Backend, x), help="Pick a backend", choices=list(Backend))
+    parser.add_argument("backend", type=lambda x: getattr(Backend, x), help="Pick a backend", choices=list(Backend))
     parser.add_argument("template", type=Path, help="Path to template directory")
     args = parser.parse_args()
     TestApp(args.backend, args.template).run()
