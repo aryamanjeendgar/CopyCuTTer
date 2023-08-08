@@ -21,7 +21,7 @@ from textual.containers import VerticalScroll
 from textual.events import Key
 from textual.reactive import var
 from textual.widget import Widget
-from textual.widgets import Footer, Input, Label, Select, Static, TabbedContent, TabPane
+from textual.widgets import DirectoryTree, Footer, Input, Label, Select, Static, TabbedContent, TabPane
 
 from .code_browser import CodeBrowserWidget
 
@@ -104,6 +104,7 @@ class TestApp(App):
         ("h", "dump_values", "Generate Template"),
         ("f", "toggle_files", "Toggle Files"),
         ("q", "quit", "Quit"),
+        ("r", "refresh_tree", "Refresh Tree"),
     ]
 
     CSS = """
@@ -157,7 +158,7 @@ class TestApp(App):
             with TabPane("Form", id="form"):
                 yield VerticalScroll(*form_widgets)
             with TabPane("Code-Browser", id="code-browser"):
-                yield CodeBrowserWidget()
+                yield CodeBrowserWidget("./")
         yield Footer()
 
     def action_dump_values(self) -> None:
@@ -431,6 +432,9 @@ class TestApp(App):
         else:
             print("Error:", response.status_code)
         return file_content
+
+    def action_refresh_tree(self) -> None:
+        self.query_one(CodeBrowserWidget)._path = "~/Documents/"
 
     def action_toggle_files(self) -> None:
         """Called in response to key binding."""

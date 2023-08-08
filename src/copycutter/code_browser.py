@@ -20,12 +20,17 @@ class CodeBrowserWidget(Static):
     """Textual code browser app."""
 
     CSS_PATH = "code_browser.css"
+    _path: str
+
+    def __init__(self, path):
+        self._path = path
+        super().__init__()
 
     def compose(self) -> ComposeResult:
         """Compose our UI."""
-        path = "./"  # if len(sys.argv) < 2 else sys.argv[1]
+        # path = "./"  # if len(sys.argv) < 2 else sys.argv[1]
         with Container():
-            yield DirectoryTree(path, id="tree-view")
+            yield DirectoryTree(self._path, id="tree-view")
             with VerticalScroll(id="code-view"):
                 yield Static(id="code", expand=True)
 
