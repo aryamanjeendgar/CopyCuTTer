@@ -7,12 +7,13 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from copier.errors import UnsafeTemplateError
 
 import requests
 import yaml
 from cookiecutter.exceptions import OutputDirExistsException
 from cookiecutter.main import cookiecutter
+from copier.errors import UnsafeTemplateError
+from copier.main import run_copy
 from rich.console import RenderableType
 from textual import events, on
 from textual.app import App, ComposeResult
@@ -21,7 +22,6 @@ from textual.events import Key
 from textual.reactive import var
 from textual.widget import Widget
 from textual.widgets import Footer, Input, Label, Select, Static, TabbedContent, TabPane
-from copier.main import run_copy
 
 from .code_browser import CodeBrowserWidget
 
@@ -302,7 +302,21 @@ class TestApp(App):
                         # If descriptions for fields exist
                         # TODO: Figure out how to deal with
                         # `placeholder` and `default` fields
-                        widgets.append(TextQuestion("", prompt[0], prompt[1]["help"]))
+                        if "placeholder" in prompt[1]:
+                            if "default" in prompt[1]:
+                                # Can have both defaults + placeholders in this case
+                                widgets.append(TextQuestion(prompt[1]["placeholder"], prompt[0], prompt[1]["help"]))
+                                widgets[-1]._input.value = prompt[1]["default"]
+                            else:
+                                # Placeholder, but no default
+                                widgets.append(TextQuestion(prompt[1]["placeholder"], prompt[0], prompt[1]["help"]))
+                        elif "default" in prompt[1]:
+                            # Only a default
+                            widgets.append(TextQuestion("", prompt[0], prompt[1]["help"]))
+                            widgets[-1]._input.value = prompt[1]["default"]
+                        else:
+                            # Only a help text, and no placeholder nor a default
+                            widgets.append(TextQuestion("", prompt[0], prompt[1]["help"]))
                     else:
                         # ... in case they do not
                         widgets.append(TextQuestion("", prompt[0], prompt[0]))
@@ -405,9 +419,9 @@ class TestApp(App):
 
     def grab_github(self, repo_owner: str, repo_name: str) -> str:
         if self._backend == Backend.copier:
-            url = 'https://api.github.com/repos/{}/{}/contents/copier.yml'.format(repo_owner, repo_name)
+            url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/contents/copier.yml'
         else:
-            url = 'https://api.github.com/repos/{}/{}/contents/cookiecutter.json'.format(repo_owner, repo_name)
+            url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/contents/cookiecutter.json'
         response = requests.get(url)
         # Check if the request was successful (status code 200)
         if response.status_code == 200:
