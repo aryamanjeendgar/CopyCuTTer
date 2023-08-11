@@ -4,7 +4,7 @@ import argparse
 import base64
 import enum
 import json
-import subprocess
+import shutil
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -192,7 +192,7 @@ class TestApp(App[None]):
             template = self.read_cookie_cutter(None, None)
         widgets: list[SelectQuestion | TextQuestion] = []
         if isinstance(template, dict):
-            """The __prompts__ field is available"""
+            # The __prompts__ field is available
             prompts = template["__prompts__"]
             for prompt in prompts:
                 if isinstance(template[prompt], str):
@@ -223,7 +223,7 @@ class TestApp(App[None]):
                             )
                         )
         else:
-            """No __prompts__"""
+            # No __prompts__
             for prompt in template:
                 if prompt[0][0] != "_":
                     if isinstance(prompt[1], str):
@@ -379,7 +379,7 @@ class TestApp(App[None]):
         # TODO: Allow this to generalize to other `cookiecutter` templates other than
         # `cookie` in a more structured manner
         if not Path("tmp").is_dir():
-            subprocess.run(["mkdir", "tmp"])
+            Path("tmp").mkdir()
         try:
             cookiecutter(
                 template=str(self._template),
@@ -388,17 +388,17 @@ class TestApp(App[None]):
                 extra_context=context,
             )
         except OutputDirExistsException:
-            subprocess.run(["rm", "-rf", "tmp"])
-            subprocess.run(["mkdir", "tmp"])
+            shutil.rmtree("tmp")
+            Path("tmp").mkdir()
             cookiecutter(
                 template=str(self._template),
                 no_input=True,
                 output_dir="tmp",
                 extra_context=context,
             )
-            """Some code for removing existing directory and regenerating the project
-            That code should go into the handler for the button/binding that is pressed
-            for committing changes"""
+            # Some code for removing existing directory and regenerating the project
+            # That code should go into the handler for the button/binding that is pressed
+            # for committing changes
 
     def call_copier_template(self) -> None:
         textboxes = self.query(TextQuestion)
@@ -431,7 +431,7 @@ class TestApp(App[None]):
                 # .. else use the first option as the intended default
                 context[str(select.value[2])] = list(select._input._options)[1][0]
         if not Path("tmp").is_dir():
-            subprocess.run(["mkdir", "tmp"])
+            Path("tmp").mkdir()
         # with open("test.txt", "w") as op_file:
         #     op_file.write(json.dumps(context))
         try:
@@ -449,7 +449,7 @@ class TestApp(App[None]):
             url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/copier.yml"
         else:
             url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/cookiecutter.json"
-        response = requests.get(url)
+        response = requests.get(url, timeout=5)
         # Check if the request was successful (status code 200)
         if response.status_code == 200:
             # Attempt to decode the response content as JSON
@@ -475,7 +475,6 @@ class TestApp(App[None]):
         """Placeholder for writing to output when TAB/s-TAB is detected in the input-stream"""
         if event.key == "return":
             pass
-        pass
 
 
 def main() -> None:

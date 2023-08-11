@@ -46,7 +46,7 @@ class CodeBrowserWidget(Static):
                 indent_guides=True,
                 theme="github-dark",
             )
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             code_view.update(Traceback(theme="github-dark", width=None))
             self.sub_title = "ERROR"
         else:
@@ -55,11 +55,9 @@ class CodeBrowserWidget(Static):
             self.sub_title = str(event.path)
 
 
-"""
-The problem was essentially to see how to split the contents
-of the initial `code_browser` would be split across the actual `App`
-and the `Static` widget
-"""
+# The problem was essentially to see how to split the contents
+# of the initial `code_browser` would be split across the actual `App`
+# and the `Static` widget
 
 
 class TestApp(App[None]):

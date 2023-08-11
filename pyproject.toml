@@ -164,10 +164,18 @@ py-version = "3.8"
 ignore-paths= ["src/copycutter/_version.py"]
 reports.output-format = "colorized"
 similarities.ignore-imports = "yes"
+similarities.min-similarity-lines = 10  # TODO: reduce this
 messages_control.disable = [
   "design",
   "fixme",
   "line-too-long",
   "missing-module-docstring",
   "wrong-import-position",
+  "missing-class-docstring",
+  "missing-function-docstring",
+  "invalid-name",
+  "protected-access",  # TODO: Remove this
+  "too-many-nested-blocks",  # TODO: Remove this
+  "not-an-iterable",  # TODO: Is this real?
+  "attribute-defined-outside-init",  # TODO: Remove this
 ]
