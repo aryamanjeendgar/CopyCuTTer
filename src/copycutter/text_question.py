@@ -4,9 +4,10 @@ import argparse
 import base64
 import enum
 import json
-import os
 import subprocess
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 import requests
 import yaml
@@ -20,7 +21,6 @@ from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
 from textual.events import Key
 from textual.reactive import var
-from textual.widget import Widget
 from textual.widgets import Footer, Input, Label, Select, Static, TabbedContent, TabPane
 
 from .code_browser import CodeBrowserWidget
@@ -30,16 +30,12 @@ class Backend(enum.Enum):
     cookie = enum.auto()
     copier = enum.auto()
 
+
 NAMES = ["Form", "Code-Browser"]
 
 
 class TextQuestion(Static):
-    _label: Label
-    _input: Input
-    _property_val: str
-    _prompt: str
-
-    def __init__(self, placeholder, property_val, prompt, **kwargs):
+    def __init__(self, placeholder: str, property_val: str, prompt: str, **kwargs: Any):
         super().__init__(**kwargs)
         self._label = Label(prompt)
         self._input = Input(placeholder=placeholder)
@@ -63,13 +59,14 @@ class TextQuestion(Static):
 
 
 class SelectQuestion(Static):
-    _label: Label
-    _input: Select
-    _property_val: str
-    _prompt: str
-    _extras: str | None
-
-    def __init__(self, lines, property_val, prompt, _extras, **kwargs):
+    def __init__(
+        self,
+        lines: Iterable[str],
+        property_val: str,
+        prompt: str,
+        _extras: dict[str, str] | None,
+        **kwargs: Any,
+    ):
         super().__init__(**kwargs)
         self._label = Label(prompt)
         self._input = Select((line, line) for line in lines)
@@ -82,7 +79,7 @@ class SelectQuestion(Static):
         yield self._input
 
     @property
-    def value(self) -> tuple[RenderableType, str | None, str, str | None]:
+    def value(self) -> tuple[RenderableType, str | None, str, dict[str, str] | None]:
         return (
             self._label.renderable,
             self._input.value,
@@ -98,9 +95,8 @@ class SelectQuestion(Static):
         return super().watch_mouse_over(value)
 
 
-class TestApp(App):
-
-    BINDINGS = [
+class TestApp(App[None]):
+    BINDINGS = [  # noqa: RUF012
         ("h", "dump_values", "Generate Template"),
         ("f", "toggle_files", "Toggle Files"),
         ("q", "quit", "Quit"),
@@ -134,18 +130,20 @@ class TestApp(App):
 
     show_tree = var(True)
 
-    def __init__(self, backend: Backend, template: Path, *args, **kwargs) -> None:
+    def __init__(
+        self, backend: Backend, template: Path, *args: Any, **kwargs: Any
+    ) -> None:
         super().__init__(*args, **kwargs)
 
         self._backend = backend
         self._template = template
-        #HACK, structure this out better
+        # HACK, structure this out better
         path_string = str(template)
         if "gh" in path_string:
-            self._repo_owner = path_string[3: path_string.index('/')]
-            self._repo_name = path_string[path_string.index('/') + 1: ]
+            self._repo_owner = path_string[3 : path_string.index("/")]
+            self._repo_name = path_string[path_string.index("/") + 1 :]
 
-    def on_mount(self, event: events.Mount) -> None:
+    def on_mount(self, _event: events.Mount) -> None:
         self.query_one(TabbedContent).focus()
 
     def compose(self) -> ComposeResult:
@@ -166,27 +164,33 @@ class TestApp(App):
         else:
             self.call_cookie_template()
 
-    def read_cookie_cutter(self, repo_owner: str | None, repo_name: str | None) -> list[tuple[str, str]] | dict:
+    def read_cookie_cutter(
+        self, repo_owner: str | None, repo_name: str | None
+    ) -> list[tuple[str, str]] | dict[str, Any]:
         """Helper method for reading cookiecutter.json"""
-        cookie_handle = None
-        if Path.exists(self._template):
-            fp = open(self._template / "cookiecutter.json")
-            cookie_handle = json.load(fp)
+        cookie_handle: dict[str, Any]
+        if self._template.exists():
+            with self._template.joinpath("cookiecutter.json").open(
+                encoding="utf-8"
+            ) as fp:
+                cookie_handle = json.load(fp)
+        elif repo_owner is not None and repo_name is not None:
+            f = self.grab_github(repo_owner, repo_name)
+            cookie_handle = json.loads(f)
         else:
-            if repo_owner is not None and repo_name is not None:
-                f = self.grab_github(repo_owner, repo_name)
-                cookie_handle = json.loads(f)
+            msg = "No template found"
+            raise ValueError(msg)
         if "__prompts__" in cookie_handle:
             return cookie_handle
         return list(cookie_handle.items())
 
-    def parse_cookie_cutter(self) -> list[Widget]:
+    def parse_cookie_cutter(self) -> list[SelectQuestion | TextQuestion]:
         """Helper method for parsing read_cookie_cutter"""
-        if hasattr(self, '_repo_owner'):
+        if hasattr(self, "_repo_owner"):
             template = self.read_cookie_cutter(self._repo_owner, self._repo_name)
         else:
             template = self.read_cookie_cutter(None, None)
-        widgets = []
+        widgets: list[SelectQuestion | TextQuestion] = []
         if isinstance(template, dict):
             """The __prompts__ field is available"""
             prompts = template["__prompts__"]
@@ -232,24 +236,29 @@ class TestApp(App):
                         )
         return widgets
 
-    def read_copier(self, repo_owner: str | None, repo_name: str | None) -> list[tuple[str, dict]]:
+    def read_copier(
+        self, repo_owner: str | None, repo_name: str | None
+    ) -> list[tuple[str, dict[str, str]]]:
         """Helper method for reading in copier.yml"""
         copier_handle = None
-        if Path.exists(self._template):
-            f = open(self._template / "copier.yml")
+        if self._template.exists():
+            with self._template.joinpath("copier.yml").open(encoding="utf-8") as fp:
+                copier_handle = yaml.safe_load(fp)
+        elif repo_owner is not None and repo_name is not None:
+            f = self.grab_github(repo_owner, repo_name)
+            copier_handle = yaml.safe_load(f)
         else:
-            if repo_owner is not None and repo_name is not None:
-                f = self.grab_github(repo_owner, repo_name)
-        copier_handle = yaml.safe_load(f)
+            msg = "No template found"
+            raise ValueError(msg)
         return list(copier_handle.items())
 
-    def parse_copier(self) -> list[Widget]:
-        """Helper method for parsing read_copier's output""" ""
-        if hasattr(self, '_repo_owner'):
+    def parse_copier(self) -> list[SelectQuestion | TextQuestion]:
+        """Helper method for parsing read_copier's output"""
+        if hasattr(self, "_repo_owner"):
             template = self.read_copier(self._repo_owner, self._repo_name)
         else:
             template = self.read_copier(None, None)
-        widgets = []
+        widgets: list[SelectQuestion | TextQuestion] = []
         for prompt in template:
             if prompt[0][0] != "_":
                 if "choices" in prompt[1]:
@@ -305,18 +314,32 @@ class TestApp(App):
                         if "placeholder" in prompt[1]:
                             if "default" in prompt[1]:
                                 # Can have both defaults + placeholders in this case
-                                widgets.append(TextQuestion(prompt[1]["placeholder"], prompt[0], prompt[1]["help"]))
-                                widgets[-1]._input.value = prompt[1]["default"]
+                                q = TextQuestion(
+                                    prompt[1]["placeholder"],
+                                    prompt[0],
+                                    prompt[1]["help"],
+                                )
+                                q._input.value = prompt[1]["default"]
+                                widgets.append(q)
                             else:
                                 # Placeholder, but no default
-                                widgets.append(TextQuestion(prompt[1]["placeholder"], prompt[0], prompt[1]["help"]))
+                                widgets.append(
+                                    TextQuestion(
+                                        prompt[1]["placeholder"],
+                                        prompt[0],
+                                        prompt[1]["help"],
+                                    )
+                                )
                         elif "default" in prompt[1]:
                             # Only a default
-                            widgets.append(TextQuestion("", prompt[0], prompt[1]["help"]))
-                            widgets[-1]._input.value = prompt[1]["default"]
+                            q = TextQuestion("", prompt[0], prompt[1]["help"])
+                            q._input.value = prompt[1]["default"]
+                            widgets.append(q)
                         else:
                             # Only a help text, and no placeholder nor a default
-                            widgets.append(TextQuestion("", prompt[0], prompt[1]["help"]))
+                            widgets.append(
+                                TextQuestion("", prompt[0], prompt[1]["help"])
+                            )
                     else:
                         # ... in case they do not
                         widgets.append(TextQuestion("", prompt[0], prompt[0]))
@@ -330,7 +353,7 @@ class TestApp(App):
         # TODO: The `context` builder breaks in the case `cookiecutter.json`
         # has the `__prompts__` field
         for text in textboxes:
-            if text.value[1] != "":
+            if text.value[1]:
                 # if the user gave some input use that
                 context[str(text.value[2])] = text.value[1]
             else:
@@ -349,20 +372,19 @@ class TestApp(App):
                 if select.value[-1] is not None:
                     # Again, while choosing defaults checks if the select-field is represented
                     # as a `dict`
-                    context[str(select.value[2])] = select.value[-1][
-                        select._input._options[1][0]
-                    ]
+                    value = select.value[-1][list(select._input._options)[1][0]]
+                    context[str(select.value[2])] = value
                 else:
-                    context[str(select.value[2])] = select._input._options[1][0]
+                    context[str(select.value[2])] = list(select._input._options)[1][0]
         # TODO: Allow this to generalize to other `cookiecutter` templates other than
         # `cookie` in a more structured manner
-        if not os.path.isdir("./tmp"):
+        if not Path("tmp").is_dir():
             subprocess.run(["mkdir", "tmp"])
         try:
             cookiecutter(
                 template=str(self._template),
                 no_input=True,
-                output_dir=os.path.expanduser("./tmp"),
+                output_dir="tmp",
                 extra_context=context,
             )
         except OutputDirExistsException:
@@ -371,19 +393,19 @@ class TestApp(App):
             cookiecutter(
                 template=str(self._template),
                 no_input=True,
-                output_dir=os.path.expanduser("./tmp"),
+                output_dir="tmp",
                 extra_context=context,
             )
             """Some code for removing existing directory and regenerating the project
             That code should go into the handler for the button/binding that is pressed
-            for commiting changes"""
+            for committing changes"""
 
     def call_copier_template(self) -> None:
         textboxes = self.query(TextQuestion)
         selects = self.query(SelectQuestion)
         context = {}
         for text in textboxes:
-            if text.value[1] != "":
+            if text.value[1]:
                 # if the user gave some input use that
                 context[str(text.value[2])] = text.value[1]
             else:
@@ -407,29 +429,35 @@ class TestApp(App):
                     context[str(select.value[2])] = select.value[3][select.value[1]]
             else:
                 # .. else use the first option as the intended default
-                context[str(select.value[2])] = select._input._options[1][0]
-        if not os.path.isdir("./tmp"):
+                context[str(select.value[2])] = list(select._input._options)[1][0]
+        if not Path("tmp").is_dir():
             subprocess.run(["mkdir", "tmp"])
         # with open("test.txt", "w") as op_file:
         #     op_file.write(json.dumps(context))
         try:
-            run_copy(src_path=str(self._template), dst_path='./tmp', data=context)
+            run_copy(src_path=str(self._template), dst_path="./tmp", data=context)
         except UnsafeTemplateError:
-            run_copy(src_path=str(self._template), dst_path='./tmp', data=context, unsafe=True)
+            run_copy(
+                src_path=str(self._template),
+                dst_path="./tmp",
+                data=context,
+                unsafe=True,
+            )
 
     def grab_github(self, repo_owner: str, repo_name: str) -> str:
         if self._backend == Backend.copier:
-            url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/contents/copier.yml'
+            url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/copier.yml"
         else:
-            url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/contents/cookiecutter.json'
+            url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/cookiecutter.json"
         response = requests.get(url)
         # Check if the request was successful (status code 200)
         if response.status_code == 200:
             # Attempt to decode the response content as JSON
             file_info = response.json()
-            file_content = base64.b64decode(file_info['content']).decode('utf-8')
+            file_content = base64.b64decode(file_info["content"]).decode("utf-8")
         else:
-            print("Error:", response.status_code)
+            msg = f"Error: {response.status_code}"
+            raise RuntimeError(msg)
         return file_content
 
     def action_toggle_files(self) -> None:
@@ -443,7 +471,7 @@ class TestApp(App):
             self.set_class(show_tree, "-show-tree")
 
     @on(Key)
-    def tab_shift_tab_pressed(self, event: Key):
+    def tab_shift_tab_pressed(self, event: Key) -> None:
         """Placeholder for writing to output when TAB/s-TAB is detected in the input-stream"""
         if event.key == "return":
             pass
@@ -452,7 +480,12 @@ class TestApp(App):
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("backend", type=lambda x: getattr(Backend, x), help="Pick a backend", choices=list(Backend))
+    parser.add_argument(
+        "backend",
+        type=lambda x: getattr(Backend, x),
+        help="Pick a backend",
+        choices=list(Backend),
+    )
     parser.add_argument("template", type=Path, help="Path to template directory")
     args = parser.parse_args()
     TestApp(args.backend, args.template).run()

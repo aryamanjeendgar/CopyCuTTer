@@ -29,7 +29,7 @@ class CodeBrowserWidget(Static):
             with VerticalScroll(id="code-view"):
                 yield Static(id="code", expand=True)
 
-    def on_mount(self, event: events.Mount) -> None:
+    def on_mount(self, _event: events.Mount) -> None:
         self.query_one(DirectoryTree).focus()
 
     def on_directory_tree_file_selected(
@@ -62,8 +62,8 @@ and the `Static` widget
 """
 
 
-class TestApp(App):
-    BINDINGS = [
+class TestApp(App[None]):
+    BINDINGS = [  # noqa: RUF012
         ("f", "toggle_files", "Toggle Files"),
         ("q", "quit", "Quit"),
     ]
