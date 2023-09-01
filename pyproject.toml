@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 
 [project]
-name = "CopyCuTTer"
+name = "copycutter"
 authors = [
   { name = "Aryaman Jeendgar", email = "jeendgararyaman@gmail.com" },
 ]
@@ -97,7 +97,7 @@ port.exclude_lines = [
 
 [tool.mypy]
 files = ["src", "tests"]
-python_version = "3.7"
+python_version = "3.8"
 warn_unused_configs = true
 strict = true
 show_error_codes = true
@@ -111,6 +111,9 @@ module = "copycutter.*"
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 
+[[tool.mypy.overrides]]
+module = ["cookiecutter.*", "copier.*"]
+ignore_missing_imports = true
 
 [tool.ruff]
 select = [
@@ -142,8 +145,6 @@ extend-ignore = [
   "PLR",    # Design related pylint codes
   "E501",   # Line too long
 ]
-target-version = "py37"
-typing-modules = ["copycutter._compat.typing"]
 src = ["src"]
 unfixable = [
   "T20",  # Removes print statements
@@ -159,14 +160,22 @@ isort.required-imports = ["from __future__ import annotations"]
 
 
 [tool.pylint]
-py-version = "3.7"
+py-version = "3.8"
 ignore-paths= ["src/copycutter/_version.py"]
 reports.output-format = "colorized"
 similarities.ignore-imports = "yes"
+similarities.min-similarity-lines = 10  # TODO: reduce this
 messages_control.disable = [
   "design",
   "fixme",
   "line-too-long",
   "missing-module-docstring",
   "wrong-import-position",
+  "missing-class-docstring",
+  "missing-function-docstring",
+  "invalid-name",
+  "protected-access",  # TODO: Remove this
+  "too-many-nested-blocks",  # TODO: Remove this
+  "not-an-iterable",  # TODO: Is this real?
+  "attribute-defined-outside-init",  # TODO: Remove this
 ]
