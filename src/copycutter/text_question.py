@@ -7,7 +7,7 @@ import json
 import shutil
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import requests
 import yaml
@@ -15,7 +15,7 @@ from cookiecutter.exceptions import OutputDirExistsException
 from cookiecutter.main import cookiecutter
 from copier.errors import UnsafeTemplateError
 from copier.main import run_copy
-from rich.console import RenderableType
+from rich.console import ConsoleRenderable, RenderableType, RichCast
 from textual import events, on
 from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
@@ -55,7 +55,6 @@ class TextQuestion(Static):
             self._label.update(self._property_val)
         else:
             self._label.update(self._prompt)
-        return super().watch_mouse_over(value)
 
 
 class SelectQuestion(Static):
@@ -80,9 +79,10 @@ class SelectQuestion(Static):
 
     @property
     def value(self) -> tuple[RenderableType, str | None, str, dict[str, str] | None]:
+        select_value = self._input.value
         return (
             self._label.renderable,
-            self._input.value,
+            select_value if isinstance(select_value, str) else None,
             self._property_val,
             self._extras,
         )
@@ -92,11 +92,10 @@ class SelectQuestion(Static):
             self._label.update(self._property_val)
         else:
             self._label.update(self._prompt)
-        return super().watch_mouse_over(value)
 
 
 class TestApp(App[None]):
-    BINDINGS = [  # noqa: RUF012
+    BINDINGS: ClassVar = [
         ("h", "dump_values", "Generate Template"),
         ("f", "toggle_files", "Toggle Files"),
         ("q", "quit", "Quit"),
@@ -286,70 +285,66 @@ class TestApp(App[None]):
                                     prompt[1]["choices"],
                                 )
                             )
+                    # .... Or as a list
+                    elif "help" in prompt[1]:
+                        # if descriptions for fields exist
+                        widgets.append(
+                            SelectQuestion(
+                                prompt[1]["choices"],
+                                prompt[0],
+                                prompt[1]["help"],
+                                None,
+                            )
+                        )
                     else:
-                        # .... Or as a list
-                        if "help" in prompt[1]:
-                            # if descriptions for fields exist
-                            widgets.append(
-                                SelectQuestion(
-                                    prompt[1]["choices"],
-                                    prompt[0],
-                                    prompt[1]["help"],
-                                    None,
-                                )
+                        # ... if they do not
+                        widgets.append(
+                            SelectQuestion(
+                                prompt[1]["choices"], prompt[0], prompt[0], None
                             )
+                        )
+                # A `TextQuestion` field
+                elif "help" in prompt[1]:
+                    # If descriptions for fields exist
+                    # TODO: Figure out how to deal with
+                    # `placeholder` and `default` fields
+                    if "placeholder" in prompt[1]:
+                        if "default" in prompt[1]:
+                            # Can have both defaults + placeholders in this case
+                            q = TextQuestion(
+                                prompt[1]["placeholder"],
+                                prompt[0],
+                                prompt[1]["help"],
+                            )
+                            q._input.value = prompt[1]["default"]
+                            widgets.append(q)
                         else:
-                            # ... if they do not
+                            # Placeholder, but no default
                             widgets.append(
-                                SelectQuestion(
-                                    prompt[1]["choices"], prompt[0], prompt[0], None
-                                )
-                            )
-                else:
-                    # A `TextQuestion` field
-                    if "help" in prompt[1]:
-                        # If descriptions for fields exist
-                        # TODO: Figure out how to deal with
-                        # `placeholder` and `default` fields
-                        if "placeholder" in prompt[1]:
-                            if "default" in prompt[1]:
-                                # Can have both defaults + placeholders in this case
-                                q = TextQuestion(
+                                TextQuestion(
                                     prompt[1]["placeholder"],
                                     prompt[0],
                                     prompt[1]["help"],
                                 )
-                                q._input.value = prompt[1]["default"]
-                                widgets.append(q)
-                            else:
-                                # Placeholder, but no default
-                                widgets.append(
-                                    TextQuestion(
-                                        prompt[1]["placeholder"],
-                                        prompt[0],
-                                        prompt[1]["help"],
-                                    )
-                                )
-                        elif "default" in prompt[1]:
-                            # Only a default
-                            q = TextQuestion("", prompt[0], prompt[1]["help"])
-                            q._input.value = prompt[1]["default"]
-                            widgets.append(q)
-                        else:
-                            # Only a help text, and no placeholder nor a default
-                            widgets.append(
-                                TextQuestion("", prompt[0], prompt[1]["help"])
                             )
+                    elif "default" in prompt[1]:
+                        # Only a default
+                        q = TextQuestion("", prompt[0], prompt[1]["help"])
+                        q._input.value = prompt[1]["default"]
+                        widgets.append(q)
                     else:
-                        # ... in case they do not
-                        widgets.append(TextQuestion("", prompt[0], prompt[0]))
+                        # Only a help text, and no placeholder nor a default
+                        widgets.append(TextQuestion("", prompt[0], prompt[1]["help"]))
+                else:
+                    # ... in case they do not
+                    widgets.append(TextQuestion("", prompt[0], prompt[0]))
         return widgets
 
     def call_cookie_template(self) -> None:
         """Method to call and dump the current inputs to the template"""
         textboxes = self.query(TextQuestion)
         selects = self.query(SelectQuestion)
-        context = {}
+        context: dict[str, ConsoleRenderable | RichCast | str] = {}
         # TODO: The `context` builder breaks in the case `cookiecutter.json`
         # has the `__prompts__` field
         for text in textboxes:
@@ -367,19 +362,25 @@ class TestApp(App[None]):
                     context[str(select.value[2])] = select.value[-1][select.value[1]]
                 else:
                     context[str(select.value[2])] = select.value[1]
+            # .. else use the intended default
+            elif select.value[-1] is not None:
+                # Again, while choosing defaults checks if the select-field is represented
+                # as a `dict`
+                context[str(select.value[2])] = select.value[-1][
+                    str(select._input._options[1][0])
+                ]
+            # .. else use the intended default
+            elif select.value[-1] is not None:
+                # Again, while choosing defaults checks if the select-field is represented
+                # as a `dict`
+                value = select.value[-1][list(select._input._options)[1][0]]
+                context[str(select.value[2])] = value
             else:
-                # .. else use the intended default
-                if select.value[-1] is not None:
-                    # Again, while choosing defaults checks if the select-field is represented
-                    # as a `dict`
-                    value = select.value[-1][list(select._input._options)[1][0]]
-                    context[str(select.value[2])] = value
-                else:
-                    context[str(select.value[2])] = list(select._input._options)[1][0]
+                context[str(select.value[2])] = list(select._input._options)[1][0]
         # TODO: Allow this to generalize to other `cookiecutter` templates other than
         # `cookie` in a more structured manner
-        if not Path("tmp").is_dir():
-            Path("tmp").mkdir()
+        tmp_path = Path("tmp")
+        tmp_path.mkdir(exist_ok=True)
         try:
             cookiecutter(
                 template=str(self._template),
@@ -388,8 +389,8 @@ class TestApp(App[None]):
                 extra_context=context,
             )
         except OutputDirExistsException:
-            shutil.rmtree("tmp")
-            Path("tmp").mkdir()
+            shutil.rmtree("tmp", ignore_errors=True)
+            Path("tmp").mkdir(exist_ok=True)
             cookiecutter(
                 template=str(self._template),
                 no_input=True,
@@ -403,7 +404,7 @@ class TestApp(App[None]):
     def call_copier_template(self) -> None:
         textboxes = self.query(TextQuestion)
         selects = self.query(SelectQuestion)
-        context = {}
+        context: dict[str, ConsoleRenderable | RichCast | str] = {}
         for text in textboxes:
             if text.value[1]:
                 # if the user gave some input use that
@@ -430,16 +431,16 @@ class TestApp(App[None]):
             else:
                 # .. else use the first option as the intended default
                 context[str(select.value[2])] = list(select._input._options)[1][0]
-        if not Path("tmp").is_dir():
-            Path("tmp").mkdir()
+        tmp_path = Path("tmp")
+        tmp_path.mkdir(exist_ok=True)
         # with open("test.txt", "w") as op_file:
         #     op_file.write(json.dumps(context))
         try:
-            run_copy(src_path=str(self._template), dst_path="./tmp", data=context)
+            run_copy(src_path=str(self._template), dst_path="tmp", data=context)
         except UnsafeTemplateError:
             run_copy(
                 src_path=str(self._template),
-                dst_path="./tmp",
+                dst_path="tmp",
                 data=context,
                 unsafe=True,
             )

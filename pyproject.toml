@@ -10,7 +10,7 @@ authors = [
 ]
 description = "A TUI for the `Scientific-Python/cookie` and `Copier` projects"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 classifiers = [
   "Development Status :: 1 - Planning",
   "Intended Audience :: Science/Research",
@@ -20,18 +20,19 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.7",
-  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering",
   "Typing :: Typed",
 ]
 dynamic = ["version"]
 dependencies = [
-  'textual >= 0.28.0'
+  "textual >= 0.28.0",
+  "requests",
+  "pyyaml",
 ]
 
 [project.optional-dependencies]
@@ -42,11 +43,7 @@ cookiecutter = [
   "cookiecutter",
 ]
 test = [
-  "pytest >=6",
-  "pytest-cov >=3",
-]
-dev = [
-  "pytest >=6",
+  "pytest >=8",
   "pytest-cov >=3",
 ]
 docs = [
@@ -65,12 +62,13 @@ Homepage = "https://github.com/aryamanjeendgar/CopyCuTTer"
 "Bug Tracker" = "https://github.com/aryamanjeendgar/CopyCuTTer/issues"
 Discussions = "https://github.com/aryamanjeendgar/CopyCuTTer/discussions"
 Changelog = "https://github.com/aryamanjeendgar/CopyCuTTer/releases"
+
 [tool.hatch]
 version.path = "src/copycutter/__init__.py"
-envs.default.dependencies = [
-  "pytest",
-  "pytest-cov",
-]
+envs.default.features = ["test", "copier", "cookiecutter"]
+
+[tool.uv]
+dev-dependencies = ["copycutter[test,copier,cookiecutter]"]
 
 
 [tool.pytest.ini_options]
@@ -97,12 +95,11 @@ port.exclude_lines = [
 
 [tool.mypy]
 files = ["src", "tests"]
-python_version = "3.8"
+python_version = "3.9"
 warn_unused_configs = true
 strict = true
-show_error_codes = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
-warn_unreachable = true
+warn_unreachable = false  # TODO: should be able to re-enable with better types
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
@@ -112,12 +109,12 @@ disallow_untyped_defs = true
 disallow_incomplete_defs = true
 
 [[tool.mypy.overrides]]
-module = ["cookiecutter.*", "copier.*"]
+module = ["cookiecutter.*"]
 ignore_missing_imports = true
 
-[tool.ruff]
-select = [
-  "E", "F", "W", # flake8
+
+[tool.ruff.lint]
+extend-select = [
   "B",           # flake8-bugbear
   "I",           # isort
   "ARG",         # flake8-unused-arguments
@@ -141,26 +138,22 @@ select = [
   "NPY",         # NumPy specific rules
   "PD",          # pandas-vet
 ]
-extend-ignore = [
-  "PLR",    # Design related pylint codes
-  "E501",   # Line too long
+ignore = [
+  "PLR09",   # Design related pylint codes
+  "ISC001",  # Conflicts with the formatter
+  "PLR2004", # Magic value
 ]
-src = ["src"]
-unfixable = [
-  "T20",  # Removes print statements
-  "F841", # Removes unused variables
-]
-exclude = []
+typing-modules = ["copycutter._compat.typing"]
 flake8-unused-arguments.ignore-variadic-names = true
 isort.required-imports = ["from __future__ import annotations"]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "tests/**" = ["T20"]
 "noxfile.py" = ["T20"]
 
 
 [tool.pylint]
-py-version = "3.8"
+py-version = "3.9"
 ignore-paths= ["src/copycutter/_version.py"]
 reports.output-format = "colorized"
 similarities.ignore-imports = "yes"
