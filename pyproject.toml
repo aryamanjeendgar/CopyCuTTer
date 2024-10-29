@@ -7,6 +7,7 @@ build-backend = "hatchling.build"
 name = "copycutter"
 authors = [
   { name = "Aryaman Jeendgar", email = "jeendgararyaman@gmail.com" },
+  { name = "Henry Schreiner", email = "HenrySchreinerIII@gmail.com"}
 ]
 description = "A TUI for the `Scientific-Python/cookie` and `Copier` projects"
 readme = "README.md"
