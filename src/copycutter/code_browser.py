@@ -5,7 +5,10 @@ Run with:
 
     python -m copycutter.code_browser PATH
 """
+
 from __future__ import annotations
+
+from typing import ClassVar
 
 from rich.syntax import Syntax
 from rich.traceback import Traceback
@@ -61,7 +64,7 @@ class CodeBrowserWidget(Static):
 
 
 class TestApp(App[None]):
-    BINDINGS = [  # noqa: RUF012
+    BINDINGS: ClassVar = [
         ("f", "toggle_files", "Toggle Files"),
         ("q", "quit", "Quit"),
     ]
