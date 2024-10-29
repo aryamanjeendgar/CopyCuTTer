@@ -1,0 +1,50 @@
+{
+  "project_name": "package",
+  "org": "org",
+  "url": "https://github.com/{{ cookiecutter.org }}/{{ cookiecutter.project_name }}",
+  "full_name": "My Name",
+  "email": "me@email.com",
+  "project_short_description": "A great package.",
+  "license": ["BSD", "Apache", "MIT"],
+  "backend": [
+    "hatch",
+    "flit",
+    "pdm",
+    "whey",
+    "poetry",
+    "setuptools621",
+    "setuptools",
+    "pybind11",
+    "skbuild",
+    "mesonpy",
+    "maturin"
+  ],
+  "__year": "{% now 'utc', '%Y' %}",
+  "__project_slug": "{{ cookiecutter.project_name | lower | replace('-', '_') | replace('.', '_') }}",
+  "__type": "{{ 'compiled' if cookiecutter.backend in ['pybind11', 'skbuild', 'mesonpy', 'maturin'] else 'pure' }}",
+  "__answers": "",
+  "__ci": "{{ 'github' if 'github.com' in cookiecutter.url else 'gitlab' }}",
+  "__prompts__": {
+    "project_name": "The name of your project",
+    "org": "The name of your (GitHub?) org",
+    "url": "The url to your GitHub or GitLab repository",
+    "full_name": "Your name",
+    "email": "Your email",
+    "project_short_description": "A short description of your project",
+    "license": "Select a license",
+    "backend": {
+      "__prompt__": "Choose a build backend",
+      "hatch": "Hatchling                      - Pure Python (recommended)",
+      "flit": "Flit-core                      - Pure Python (minimal)",
+      "pdm": "PDM-backend                    - Pure Python",
+      "whey": "Whey                           - Pure Python",
+      "poetry": "Poetry                         - Pure Python",
+      "setuptools621": "Setuptools with pyproject.toml - Pure Python",
+      "setuptools": "Setuptools with setup.py       - Pure Python",
+      "pybind11": "Setuptools and pybind11        - Compiled C++",
+      "skbuild": "Scikit-build-core              - Compiled C++ (recommended)",
+      "mesonpy": "Meson-python                  - Compiled C++ (also good)",
+      "maturin": "Maturin                       - Compiled Rust (recommended)"
+    }
+  }
+}
