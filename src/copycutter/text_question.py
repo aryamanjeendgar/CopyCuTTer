@@ -15,12 +15,13 @@ from cookiecutter.exceptions import OutputDirExistsException
 from cookiecutter.main import cookiecutter
 from copier.errors import UnsafeTemplateError
 from copier.main import run_copy
-from rich.console import ConsoleRenderable, RenderableType, RichCast
+from rich.console import ConsoleRenderable, RichCast
 from textual import events, on
 from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
 from textual.events import Key
 from textual.reactive import var
+from textual.visual import VisualType
 from textual.widgets import Footer, Input, Label, Select, Static, TabbedContent, TabPane
 
 from .code_browser import CodeBrowserWidget
@@ -47,7 +48,7 @@ class TextQuestion(Static):
         yield self._input
 
     @property
-    def value(self) -> tuple[RenderableType, str, str]:
+    def value(self) -> tuple[VisualType, str, str]:
         return (self._label.renderable, self._input.value, self._property_val)
 
     def watch_mouse_over(self, value: bool) -> None:
@@ -78,7 +79,7 @@ class SelectQuestion(Static):
         yield self._input
 
     @property
-    def value(self) -> tuple[RenderableType, str | None, str, dict[str, str] | None]:
+    def value(self) -> tuple[VisualType, str | None, str, dict[str, str] | None]:
         select_value = self._input.value
         return (
             self._label.renderable,
